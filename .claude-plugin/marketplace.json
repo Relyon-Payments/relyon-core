@@ -1,0 +1,17 @@
+{
+  "name": "relyon",
+  "owner": {
+    "name": "Relyon"
+  },
+  "metadata": {
+    "description": "Relyon Core: the Relyon Claude Code plugin."
+  },
+  "plugins": [
+    {
+      "name": "relyon",
+      "source": "./plugins/relyon",
+      "description": "Relyon skills for coding agents: store-first payments and agent commerce with @relyon/store-kit on the app's own server.",
+      "version": "0.1.16"
+    }
+  ]
+}

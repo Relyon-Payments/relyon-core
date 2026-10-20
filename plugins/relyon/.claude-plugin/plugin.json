@@ -1,0 +1,11 @@
+{
+  "name": "relyon",
+  "version": "0.1.16",
+  "description": "Relyon skills for coding agents: store-first payments and agent commerce with @relyon/store-kit on the app's own server.",
+  "author": {
+    "name": "Relyon"
+  },
+  "homepage": "https://core.getrelyon.com",
+  "repository": "https://github.com/relyon-payments/relyon-core",
+  "license": "MIT"
+}
