@@ -7,7 +7,7 @@
 
 These seven rules are identical in every Relyon skill. They override anything else you read.
 
-1. Install `@relyon/store-kit@0.1.0` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.1` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -25,7 +25,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   serves the app's pages and can't run the kit's handlers on the store's
   domain paths.
 - **Works in backend functions (untested on Base44 so far):** creating the kit
-  with `npm:@relyon/store-kit@0.1.0`, `priceCart` and `createOrder` reading the
+  with `npm:@relyon/store-kit@0.1.1`, `priceCart` and `createOrder` reading the
   app's Base44 entities, `kit.syncCatalog`, `kit.cardFields`,
   `kit.createPayment` and `kit.reportFulfillment`. Use the two checkout
   functions in the "Checkout on a builder platform" section.
@@ -49,7 +49,17 @@ Read this first. It says what of the Relyon skill below works on Base44.
 
 Contract: the approved public v1 contract dated **2026-10-30**, at
 `https://core.getrelyon.com/v1/openapi.yaml` (another deployment:
-`<base URL>/v1/openapi.yaml`).
+`<service origin>/v1/openapi.yaml`).
+
+The canonical API base is `https://core.getrelyon.com/api`; `/v1/domains`
+therefore means `https://core.getrelyon.com/api/v1/domains`. The download URL
+above and the store's own routes are separate. Retain operator-confirmed API
+base overrides for other deployments.
+
+**In the Start here flow** (`relyon-setup`) this skill covers step 6's policy
+details, step 7 (domain verification), step 11 (the public scan) and the
+hand-over. Return terms and support contacts come from the merchant: ask, and
+check what `relyon-store-brief.md` says, but never write placeholder policies.
 
 ## The agent's job ends in Test
 
@@ -57,9 +67,19 @@ Going live is not a code change the agent makes. Relyon staff enable Live for
 the merchant after their own review. The agent's job is to leave a store that
 works end to end in Test and a clear hand-over.
 
-- Never ask for, accept, paste or configure a `rly_live_…` key. The kit
-  refuses one, and the CLI needs an explicit `--allow-live` the agent must not
-  pass.
+- Never ask for, accept, paste or configure a `rly_live_…` key. The kit runs
+  Live only with a double opt-in, a Live key **and** `relyon.live: true`; a
+  Live key alone, or the option with a Test key, is refused when the kit is
+  created. The example server sets neither `relyon.live` nor `store.publicUrl`;
+  whoever activates Live after staff review wires both deliberately. Live mode also needs
+  `STORE_PUBLIC_URL` to be an `https` origin naming one of the store's
+  hostnames, never `localhost`, an IP address or a `*.replit.dev` preview host.
+  Even then Relyon refuses Live payments until **Relyon staff** approve the
+  store and attach its processor account. Never set any of this yourself.
+- `npx @relyon/store-kit doctor` checks Live only with `--live` (or
+  `RELYON_LIVE=true`) and a Live key; it has no `--allow-live` flag. The
+  separate `relyon` CLI refuses Live keys unless given `--allow-live`. The agent
+  passes none of these.
 - Never change code to work around a Test-only refusal.
 - When everything below is done, **stop and hand over** to the merchant.
 
@@ -148,8 +168,13 @@ nothing about the store's DNS routing or hosting changes.
   ordinary returns; keep its window and conditions qualified to those goods.
 - For own-brand goods, explicitly set `brand`, the store's SKU as `mpn`, and
   `feed.ownBrand: true`; the kit never invents identifiers from the store name or
-  product ID. Use `feed.customGoods: true` only when neither GTIN nor MPN exists;
-  never combine these attestations. See the example-store reference bundled
+  product ID. Made-to-order goods with no GTIN or MPN at all use
+  `feed.customGoods: true` alone. Own-brand goods made to order (no GTIN, but
+  the store's own SKU as MPN) may set both `feed.customGoods: true` and
+  `feed.ownBrand: true` with `brand` and `mpn`: since 0.1.1 that is an
+  own-brand item, not a conflict. Never set `customGoods` on a product with a
+  GTIN, and never set an attestation the merchant hasn't confirmed. See the
+  example-store reference bundled
   with `relyon-catalog`; its identifiers are synthetic, not merchant facts.
 - `GET /v1/channels` shows each agent channel's state. Pausing and resuming
   are the merchant's choice; the agent doesn't enable channels.
@@ -160,10 +185,24 @@ Each store has its own processor account and merchant ID per environment.
 **Relyon staff enter it**; the store can only read it with
 `GET /v1/processor_account` (provider, status, the MID's last four
 characters and the fee schedule, never credentials). Before staff enter it,
-it reads `not_configured`, and payments in that environment answer
-`processor_not_configured`. That is expected before hand-over: report it,
-don't work around it. The operation may answer 404 or 501 on deployments
+it reads `not_configured`. In Live, payments then answer
+`processor_not_configured`. In Test, a sandbox without an account still takes
+payments with the Test card fields' mock payment methods, so the Test purchase
+works; if a Test payment does answer `processor_not_configured` (an account
+staff entered but haven't finished), record the Test purchase as blocked. Either
+way it is expected before hand-over: report it, don't work around it. The operation may answer 404 or 501 on deployments
 that don't implement it yet.
+
+## The public scan
+
+After the Test purchase, ask the merchant to run the free readiness scan at
+`https://core.getrelyon.com/scan` on the store's public URL (it needs the
+published HTTPS host, not a development preview). It reads only what any
+visitor or agent can see on the store's public pages and discovery files
+(such as `llms.txt`, the sitemap and `robots.txt`), and it never buys
+anything. Fix each item it reports as missing, then run the kit's doctor
+again. Items it couldn't check aren't failures; retry later. A good scan is
+not a Live approval.
 
 ## Hand-over checklist
 
@@ -182,7 +221,13 @@ Give the merchant, in plain words:
 4. Production settings still needed: durable state, `RELYON_WEBHOOK_SECRET`,
    and the server environment the Live key will go into. Relyon staff or the
    merchant set the Live key there; the agent never does.
-5. Open items: anything `relyon doctor` reports for `keys`, `catalog` or
-   `webhook`, and any operation the deployment didn't implement.
+5. Open items: anything `npx @relyon/store-kit doctor` reports as FAIL (or
+   `relyon doctor` for `keys`, `catalog` or `webhook`), anything the public
+   scan reports as missing, any operation the deployment didn't implement, and
+   every Start here step recorded as blocked, with its code or message.
+6. How to ask for Live: the merchant, signed in to the Relyon dashboard
+   (`https://core.getrelyon.com`) with the account that claimed the sandbox,
+   requests go-live in its **Go live** section and shares this list with
+   Relyon staff if asked. The scan and the doctor don't start a review.
 
-Then stop. Relyon staff enable Live.
+Then stop. Relyon staff review the request and enable Live.

@@ -6,10 +6,20 @@ durable stores. This example uses Postgres through any client with
 `query(text, params)` returning `{ rows, rowCount }` (a `pg` `Pool` works).
 Adapt the SQL to the app's own database; keep the guarantees:
 
-- `claimOrder` is a single atomic insert. Exactly one caller gets `true` for a
-  payment ID, across every process, so `createOrder` runs once per payment.
-- `releaseOrder` deletes the claim, so a retry can create the order after
-  `createOrder` failed.
+- `claimOrder` is a single atomic statement. Exactly one caller at a time gets
+  `true` for a payment ID, across every process, so `createOrder` runs once per
+  payment. A claim holds for the kit's lease (`orderClaimLeaseMs`, default 2
+  minutes): a claim that was never marked created may be taken over once its
+  lease has passed, because the server that held it may have died while creating
+  the order. A claim marked created never expires.
+- `completeOrder` marks the claim created after `createOrder` returned.
+- `releaseOrder` deletes the claim after `createOrder` threw, only while that
+  attempt (`claimId`) still holds it, so a retry can create the order.
+- `orderClaimStatus` answers `"created"`, `"creating"` (an unexpired claim) or
+  `null`, so the kit can tell an order another request is creating from one that
+  exists. Implement all four; without the last two, claims never expire and
+  checkouts can stay order pending (see `store-kit-reference.md`, "Production
+  stores").
 - Agent events are kept until Relyon accepted them (`remove` is called only
   then), in the order they were appended, and duplicates by `id` are ignored.
   Never make `append` a no-op or cap the table to zero rows; reporting must
@@ -34,7 +44,9 @@ create table if not exists relyon_checkouts (
 create index if not exists relyon_checkouts_agent on relyon_checkouts (agent_checkout_id);
 create table if not exists relyon_order_claims (
   payment_id text primary key,
-  claimed_at timestamptz not null default now()
+  claim_id text,
+  created boolean not null default false,
+  expires_at bigint -- the kit's clock (ms); null once created
 );
 create table if not exists relyon_agent_events (
   seq bigserial primary key,
@@ -75,13 +87,32 @@ export function postgresCheckoutState(db) {
            set agent_checkout_id = excluded.agent_checkout_id, record = excluded.record, updated_at = excluded.updated_at`,
         [record.protocol, record.sessionId, record.agentCheckoutId, JSON.stringify(record), record.updatedAt]);
     },
-    async claimOrder(paymentId) {
+    // One statement: a new claim, or a takeover of an unfinished claim whose lease passed.
+    async claimOrder(paymentId, { claimId = null, now = Date.now(), leaseMs = 120_000 } = {}) {
       const { rowCount } = await db.query(
-        "insert into relyon_order_claims (payment_id) values ($1) on conflict do nothing", [paymentId]);
+        `insert into relyon_order_claims (payment_id, claim_id, expires_at) values ($1, $2, $3)
+         on conflict (payment_id) do update set claim_id = excluded.claim_id, expires_at = excluded.expires_at
+           where not relyon_order_claims.created and relyon_order_claims.expires_at <= $4`,
+        [paymentId, claimId, now + leaseMs, now]);
       return rowCount === 1;
     },
-    async releaseOrder(paymentId) {
-      await db.query("delete from relyon_order_claims where payment_id = $1", [paymentId]);
+    async completeOrder(paymentId) {
+      await db.query(
+        `insert into relyon_order_claims (payment_id, created, expires_at) values ($1, true, null)
+         on conflict (payment_id) do update set created = true, expires_at = null`, [paymentId]);
+    },
+    async releaseOrder(paymentId, claimId) {
+      await db.query(
+        `delete from relyon_order_claims
+         where payment_id = $1 and not created and ($2::text is null or claim_id is null or claim_id = $2)`,
+        [paymentId, claimId ?? null]);
+    },
+    async orderClaimStatus(paymentId, now) {
+      const { rows } = await db.query(
+        "select created, expires_at > $2 as holding from relyon_order_claims where payment_id = $1", [paymentId, now]);
+      if (!rows[0]) return null;
+      if (rows[0].created) return "created";
+      return rows[0].holding ? "creating" : null;
     },
   };
 }

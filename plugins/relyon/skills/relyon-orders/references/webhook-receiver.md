@@ -1,14 +1,15 @@
 # The app's own webhook receiver (optional)
 
-The kit's `/relyon/webhooks` route verifies every Relyon webhook and acts on
-`agent_rules.updated`. It answers other valid events with `200` and does
-nothing else, and it doesn't answer the doctor's challenge.
+The kit's `/relyon/webhooks` route verifies every Relyon webhook, acts on
+`agent_rules.updated` and answers the doctor's `doctor.challenge` itself (with
+`RELYON_WEBHOOK_SECRET` set). It answers other valid events with `200` and does
+nothing else. For the doctor's `webhook` check, the kit's route is enough.
 
 Add a receiver of the app's own only when the app needs other events (for
-example `refund.succeeded` or `dispute.opened`) or wants `relyon doctor`'s
-`webhook` check to pass. It is a separate endpoint with its own secret, on
-the store's server. The helpers below use only Web Crypto, so they run on
-Node 20+, Deno and edge runtimes.
+example `refund.succeeded` or `dispute.opened`). It is a separate endpoint
+with its own secret, on the store's server, and it answers the challenge too.
+The helpers below use only Web Crypto, so they run on Node 20+, Deno and edge
+runtimes.
 
 ```js webhook-receiver.js
 // Verifies Relyon webhooks over the exact raw bytes. Web Crypto only.
@@ -93,10 +94,15 @@ export async function receive(request, endpoint, inbox, now = Math.floor(Date.no
   re-sends an existing Test event, with the same ID, to every enabled
   endpoint.
 
-## Making `relyon doctor`'s webhook check pass
+## The doctor's webhook check with two endpoints
 
-The doctor challenges the enabled endpoint with the **lowest ID**. Register
-the app's own receiver first, then the kit's route:
+The doctor sends its challenge to one active endpoint, even one not
+subscribed to the challenge. The contract names the endpoint with the
+**lowest ID**; the deployed server (as of contract 2026-10-30) differs and
+picks the most recently registered HTTPS endpoint. Until the two agree, don't
+depend on which one: every active endpoint must answer.
+The kit's route does, and so does the receiver above. Register this receiver
+with its own events:
 
 ```json
 { "url": "https://shop.example.com/webhooks/relyon-events", "events": ["refund.succeeded", "dispute.opened"] }

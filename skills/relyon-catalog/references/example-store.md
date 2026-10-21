@@ -90,9 +90,10 @@ export async function listProducts() {
   return PRODUCTS.map(indexProduct);
 }
 
+/** One product for the app's product page: the same source-backed facts the feeds carry, so its JSON-LD has the same brand and MPN. */
 export function getProduct(id) {
   const product = PRODUCTS.find((item) => item.id === id);
-  return product ? indexProduct(product) : null;
+  return product ? sourceProduct(product) : null;
 }
 
 /**

@@ -15,7 +15,7 @@ import express from "express";
 import { PaymentUnavailableError, StoreRefusal } from "@relyon/store-kit";
 import { storeKitMiddleware } from "@relyon/store-kit/express";
 import { createCheckoutFlow, memoryCheckouts } from "./checkout-flow.js";
-import { getProduct, priceCart } from "./store.js";
+import { findOrderByPayment, getProduct, priceCart } from "./store.js";
 
 const escape = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const money = (amount, currency) =>
@@ -60,7 +60,7 @@ ${newCheckoutHref && state !== "pending" ? `<p><a href="${escape(newCheckoutHref
  * (`postgresStoreCheckouts` in durable-state.js).
  */
 export function createApp(kit, { checkouts = memoryCheckouts() } = {}) {
-  const flow = createCheckoutFlow(kit, { priceCart, checkouts });
+  const flow = createCheckoutFlow(kit, { priceCart, checkouts, findOrder: async (paymentId) => findOrderByPayment(paymentId) });
   const app = express();
   // Run app.locals.reconcile() on a timer: replays payments still being confirmed.
   app.locals.reconcile = (options) => flow.reconcile(options);
@@ -95,8 +95,9 @@ ${kit.renderProductJsonLd(product)}
       return res.status(view.httpStatus).type("html").send(statusPage(view, `/checkout?${again}`));
     }
     // A shopper an agent handed over arrives with ?relyon_cart=…; anyone else
-    // gets the app's own cart. Only landing failures fall back, not failures
-    // pricing that independent cart or obtaining its payment fields.
+    // gets the app's own cart. Only an unattributed or invalid link falls back,
+    // never a handed-over cart the store refused, a failure pricing that
+    // independent cart, or a failure obtaining its payment fields.
     let landing;
     try {
       landing = await kit.landing(webRequest(req), { ip: req.ip });
@@ -108,6 +109,11 @@ ${kit.renderProductJsonLd(product)}
 <h1>Order status</h1><p role="status">${landing.alreadyPaid.orderPending
   ? "Your payment went through. Your order is still being placed"
   : "This order may already have been paid. Check your order status before paying again."}</p>`);
+    }
+    if (landing?.attributed && landing.refusal) {
+      // The store refused the cart the agent handed over: say why, never swap in another cart.
+      return res.status(409).type("html").send(`<!doctype html><meta charset="utf-8"><title>Checkout</title>
+<h1>Checkout</h1><p role="alert">${escape(landing.refusal.message)}</p><p><a href="/products/lavender-candle">Start shopping</a></p>`);
     }
     const accepted = landing?.attributed && !landing.refusal
       && landing.cart?.lines?.length > 0 && landing.inputs?.lines?.length > 0;
