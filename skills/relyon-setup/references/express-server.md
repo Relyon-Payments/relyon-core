@@ -85,6 +85,11 @@ ${kit.renderProductJsonLd(product)}
 
   // The checkout page, on the store's own domain.
   app.get("/checkout", async (req, res) => {
+    if (kit.checkoutStatus === "waiting for sandbox key") {
+      return res.status(503).type("html").send(`<!doctype html><meta charset="utf-8"><title>Checkout</title>
+<h1>Checkout</h1><p role="status">Checkout is waiting for sandbox key.</p><button disabled>Pay</button>
+<a href="/products/lavender-candle">Continue shopping</a>`);
+    }
     const previous = cookie(req, "checkout_ref");
     const startNew = req.query.new === "1";
     const again = new URLSearchParams({ ...req.query, new: "1" });
@@ -170,6 +175,7 @@ ${fields.html}
 
   // The browser sends only the order reference and the tokenized payment method.
   app.post("/checkout/pay", async (req, res) => {
+    if (kit.checkoutStatus === "waiting for sandbox key") return res.status(503).json({ code: "sandbox_key_pending", message: "Checkout is waiting for sandbox key." });
     const { orderReference, paymentMethod } = req.body ?? {};
     answer(res, await flow.pay({ orderReference, paymentMethod, request: webRequest(req), info: { ip: req.ip } }));
   });
@@ -194,8 +200,10 @@ Start it and stop cleanly. No catalog sync is needed for source-backed feeds:
 ```js main.js
 import { createRelyonKit } from "./relyon.js";
 import { createApp } from "./server.js";
+import { loadTestConfig } from "@relyon/store-kit/server-config";
 
-const kit = createRelyonKit();
+const privateConfig = await loadTestConfig({ project: process.cwd() });
+const kit = createRelyonKit({ env: { ...process.env, ...(privateConfig.apiKey ? { RELYON_API_KEY: privateConfig.apiKey } : {}) } });
 await kit.start();
 // catalog.source reads the store's database. syncCatalog is an optional mirror only.
 const app = createApp(kit);
