@@ -7,7 +7,7 @@
 
 These seven rules are identical in every Relyon skill. They override anything else you read.
 
-1. Install `@relyon/store-kit@0.1.1` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.2` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -25,7 +25,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   serves the app's pages and can't run the kit's handlers on the store's
   domain paths.
 - **Works in backend functions (untested on Base44 so far):** creating the kit
-  with `npm:@relyon/store-kit@0.1.1`, `priceCart` and `createOrder` reading the
+  with `npm:@relyon/store-kit@0.1.2`, `priceCart` and `createOrder` reading the
   app's Base44 entities, `kit.syncCatalog`, `kit.cardFields`,
   `kit.createPayment` and `kit.reportFulfillment`. Use the two checkout
   functions in the "Checkout on a builder platform" section.
@@ -47,6 +47,8 @@ Read this first. It says what of the Relyon skill below works on Base44.
   stop and tell the merchant; don't recreate it.
 
 
+**Step 6 of 6.** Completed prerequisites: `relyon-setup`, `relyon-catalog`, `relyon-checkout`, `relyon-agents`, `relyon-orders`; next: hand over to the merchant and stop, not another skill.
+
 Contract: the approved public v1 contract dated **2026-10-30**, at
 `https://core.getrelyon.com/v1/openapi.yaml` (another deployment:
 `<service origin>/v1/openapi.yaml`).
@@ -56,10 +58,29 @@ therefore means `https://core.getrelyon.com/api/v1/domains`. The download URL
 above and the store's own routes are separate. Retain operator-confirmed API
 base overrides for other deployments.
 
-**In the Start here flow** (`relyon-setup`) this skill covers step 6's policy
-details, step 7 (domain verification), step 11 (the public scan) and the
-hand-over. Return terms and support contacts come from the merchant: ask, and
+**In the Start here flow** (`relyon-setup`) this is step 6: review the
+troubleshooting table, recheck policies and domain verification already wired
+in setup, run the public scan, record unresolved blockers and give the
+Test-to-Live hand-over. Return terms and support contacts come from the merchant: ask, and
 check what `relyon-store-brief.md` says, but never write placeholder policies.
+
+## What this error means
+
+| You see | What it means | What to do |
+| --- | --- | --- |
+| Doctor `PASS` | That check worked from outside, on the store's public URL. | Nothing. |
+| Doctor `FAIL` | Something the store's own code, content or setup causes; the line names the route and what was wrong. | Fix it in the store and run the doctor again. |
+| Doctor `UNVERIFIED` | The doctor couldn't check it (no `RELYON_API_KEY`, or Relyon couldn't be asked). It isn't a store failure, and it isn't a pass. | Read the line. Record it as open if it doesn't clear. |
+| Doctor `N/A` | The check doesn't apply to this store (for example a feed that isn't selected). | Nothing. |
+| Doctor: "Relyon's server answered with a web page instead of data" | Relyon's API sent a web page (or a 3xx status pointing at a sign-in or protection page) where data was expected. The line shows the URL and status. Relyon may be behind access protection or temporarily unavailable; the store and its network didn't cause it. | Don't change or publish the store again. Check that `RELYON_BASE_URL` (or `--base-url`) is `https://core.getrelyon.com/api`, try later, and if it stays, record it as an open item with the URL and status. |
+| Doctor: Relyon's server had an error (HTTP 5xx) | Relyon is temporarily unavailable. | Try again in a few minutes. |
+| Doctor: DNS failure, timeout, connection refused or blocked | The machine running the doctor couldn't reach Relyon. | Check that machine's internet access and the Relyon base URL. |
+| `unavailable` at checkout (`service_unavailable`, HTTP 503, "Checkout is temporarily unavailable") | The kit couldn't get a usable answer from Relyon or couldn't read the store's agent rules, so it refused instead of guessing. Nothing was charged. | Check the server's `RELYON_API_KEY` and `RELYON_API_BASE_URL` and that the server can reach `core.getrelyon.com` over HTTPS; the server log names the failure. Never bypass the kit. |
+| `PaymentUnavailableError` from `kit.cardFields` | Card fields couldn't be created. Nothing was charged. | Show "try again shortly"; same checks as above. |
+| HTTP 503 on `/.well-known/ucp` | The kit couldn't read the store's UCP profile from Relyon (key, base URL or Relyon unreachable). | Same checks as above; the store's domain must also be added in Relyon. |
+| HTTP 503 on `/.well-known/relyon-verification` | The kit couldn't read the store's domains from Relyon. After a failure it waits briefly before asking again. | Same checks as above, then request the file again a minute later. |
+| HTTP 503 "Store discovery is temporarily unavailable." (llms.txt, the sitemap, feeds) | The store's own `catalog.source` callback threw. | Fix the callback; the server log has the error. |
+| HTML instead of JSON from Relyon (in the app's own calls, or the kit reports an answer that isn't JSON) | The request didn't reach Relyon's API: the base URL is wrong (the service origin without `/api`, or the store's own URL), or Relyon answered with a sign-in or protection page. | Use `https://core.getrelyon.com/api` as the base. If it is already right, it is on Relyon's side: try later and record it. |
 
 ## The agent's job ends in Test
 

@@ -25,6 +25,10 @@ Adapt the SQL to the app's own database; keep the guarantees:
   Never make `append` a no-op or cap the table to zero rows; reporting must
   stay on.
 - The catalog store keeps the last good catalog the kit published.
+- Payment records (`getStorePayment`/`putStorePayment`) and hand-off token
+  claims (`claimHandoffToken`) are optional members of the same store; the
+  `relyon-checkout` skill has a typed version with all of them and the two
+  extra tables. Add them before running more than one server process.
 - `postgresStoreCheckouts` holds the app's own checkouts for
   `checkout-flow.js` (`relyon-checkout`). Its `update` is one conditional
   statement, so only one request sends a payment attempt and a checkout is
