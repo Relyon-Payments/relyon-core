@@ -12,7 +12,7 @@ Merchant prompt:
 Build my store: <your store idea>. Use Relyon Core: run npx @relyon/store-kit init and follow the Relyon skills.
 ```
 
-This package is the Relyon store kit, version `0.1.3`, plus the six Relyon skills in
+This package is the Relyon store kit, version `0.1.4`, plus the six Relyon skills in
 `skills/` next to this file: `relyon-setup`, `relyon-catalog`, `relyon-checkout`, `relyon-agents`,
 `relyon-orders` and `relyon-go-live`.
 
@@ -87,6 +87,35 @@ or platform approval is promised.
    build. Record credential-dependent checks as pending and resume after a real
    Test key is configured, without rebuilding. Only after building direct the
    merchant to https://core.getrelyon.com/get-sandbox-key and host secret tooling.
+
+5. Wherever init could not save a Test key securely, on any platform, ask the merchant right
+   after setup to add `RELYON_API_KEY` themselves in **your platform's secrets or environment
+   settings** (for example Replit Secrets, Vercel or Netlify environment variables, Codespaces secrets, or a local `.env` file that is never committed). Keep building while you wait. Never ask for the key in chat and
+   never print it.
+
+## Which skill to open at each stage
+
+| Stage | Open |
+| --- | --- |
+| Install, Test key, durable state, policies, doctor | `relyon-setup` |
+| Products, prices, stock, product pages, sitemaps, feeds | `relyon-catalog` |
+| Cart pricing, checkout page, card fields, Test payment | `relyon-checkout` |
+| UCP, ACP and MCP, hand-off links, agent and crawler rules | `relyon-agents` |
+| Orders saved exactly once, fulfillment, webhooks | `relyon-orders` |
+| Publish, verify the domain, final checks, Live hand-over | `relyon-go-live` |
+
+## Test on the preview address, Live later
+
+With the Test key, agent checkout works right away on the app's preview address, on any
+coding platform or host (Replit, Lovable, Bolt, Vercel, Netlify, Cursor, Codespaces, a local
+machine and others): Relyon accepts any https address, and `localhost` over http, as the Test
+key's own Test store, with no verified domain. The kit answers there in Test mode: on
+`localhost`, on the addresses listed in `RELYON_PREVIEW_HOSTS` (set it in your platform's secrets
+or environment settings, for a tunnel or any preview URL), and on the app's own address when
+its platform names it in a well-known variable. An agent can quote, hand off to the store's own
+checkout on that address, pay with Test payment methods and get a Test order. To go live later:
+publish the app on your platform, add its domain in Relyon and verify it, then switch to a Live
+key only with the merchant's approval.
 
 Work in Test only. Never ask for a key in chat, and never print, log or commit one: the merchant
 enters keys in the platform's secrets tool. Live is enabled by Relyon staff, never by an agent.

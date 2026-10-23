@@ -64,7 +64,10 @@ export function createApp(kit, { checkouts = memoryCheckouts() } = {}) {
   const app = express();
   // Run app.locals.reconcile() on a timer: replays payments still being confirmed.
   app.locals.reconcile = (options) => flow.reconcile(options);
-  // 1. The kit first: it needs the raw body of its own routes.
+  // 1. The kit first: it needs the raw body of its own routes. It serves the
+  // discovery files too: /.well-known/ucp, /llms.txt, /sitemap-products.xml
+  // and the root sitemap index /sitemap.xml (sitemapIndex: false turns that
+  // off when the app has its own /sitemap.xml).
   app.use(storeKitMiddleware(kit));
   // 2. Then the app's own parsers, static files and routes.
   app.use(express.json({ limit: "64kb" }));
@@ -218,3 +221,41 @@ process.on("SIGTERM", () => {
   void kit.stop(); // flushes queued agent events
 });
 ```
+
+## Sitemaps and robots.txt
+
+The kit answers `/sitemap.xml` with a sitemap index that lists the product
+sitemap:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>https://shop.example.com/sitemap-products.xml</loc></sitemap>
+</sitemapindex>
+```
+
+With the kit's `robots` option (`existing()` returns the app's own
+robots.txt), the merged file keeps every original line and adds the AI
+discovery section, ending with a `Sitemap:` line for the index and one for
+the product sitemap:
+
+```text
+Sitemap: https://shop.example.com/sitemap.xml
+Sitemap: https://shop.example.com/sitemap-products.xml
+# llms.txt: https://shop.example.com/llms.txt
+```
+
+Without the `robots` option, add those two `Sitemap:` lines to the app's own
+robots.txt by hand.
+
+## On the preview address
+
+In Test mode the same server works on the app's preview address, on any
+platform: an https preview URL or tunnel, or `localhost` on its port over
+plain http. The kit adds loopback, the hostnames in `RELYON_PREVIEW_HOSTS`
+(set it in your platform's secrets or environment settings) and the app's own
+address when its platform names it in a well-known variable to
+`store.hostnames` itself, so agents can run a whole Test checkout there, and
+the hand-off link comes back to this same address. A Live key is refused there: publish, add
+and verify the domain, then switch to a Live key only with the merchant's
+approval (`relyon-go-live`).
