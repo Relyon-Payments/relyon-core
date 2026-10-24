@@ -22,6 +22,36 @@ card fields script can, and marks the element once it is ready:
 </script>
 ```
 
+## Sending the shopper to checkout from the server
+
+A "Buy now" or cart form that posts to the app answers with
+`kit.redirect(request, path)`: a `303 See Other` to `path` (starting with a
+single `/`) on this request's validated store address. Never build that
+Location or a link from `request.url` (for example
+`new URL("/checkout", request.url)`): a dev server bound to every interface
+(`next dev --hostname 0.0.0.0`) hands the app a `request.url` on `0.0.0.0`,
+which no browser can open, so the pay form never appears. In Test the kit
+reads the browser's Host header instead, and only when it names loopback or one
+of the store's hostnames; an unknown Host falls back to the primary hostname.
+A full URL or `//host` as `path` throws.
+
+```ts
+import type { StoreKit } from "@relyon/store-kit";
+declare const kit: StoreKit; // the app's kit (relyon-setup)
+
+// A route that takes a Web Request, such as a Next.js route handler (app/cart/route.ts).
+export async function POST(request: Request): Promise<Response> {
+  const form = await request.formData();
+  const product = String(form.get("product") ?? "");
+  const quantity = Math.min(99, Math.max(1, Math.trunc(Number(form.get("quantity")) || 1)));
+  const query = new URLSearchParams({ product, quantity: String(quantity) });
+  return kit.redirect(request, `/checkout?${query}`);
+}
+```
+
+With Express, pass `webRequest(req)` (see `express-server.md`) and send the
+answer's status and `Location`.
+
 The page's own script (served by the app as `/checkout.js`):
 
 ```js checkout.js

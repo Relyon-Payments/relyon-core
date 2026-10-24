@@ -42,14 +42,16 @@ export function webRequest(req) {
 /**
  * The policy pages the homepage footer links to. Write them from the
  * merchant's own answers (relyon-setup: "Ask before publishing claims").
- * Until the merchant confirms a fact, the page says "to confirm" rather than
+ * Until the merchant confirms a fact, the page says "to confirm with the merchant" rather than
  * inventing a return window, a return cost, tax handling or a brand claim.
+ * Display copy only: never pass POLICY_PAGES to policy sync, kit policies,
+ * feeds, structured policy data or API payloads.
  */
 export const POLICY_PAGES = {
-  shipping: { title: "Shipping", text: "Where we ship, delivery times and costs: to confirm with the store owner." },
-  returns: { title: "Returns", text: "Return window, which items qualify and who pays return shipping: to confirm with the store owner." },
-  privacy: { title: "Privacy", text: "How this store handles your personal data: to confirm with the store owner." },
-  terms: { title: "Terms", text: "Terms of sale, including how tax is handled: to confirm with the store owner." },
+  shipping: { title: "Shipping", text: "Where we ship, delivery times and costs: to confirm with the merchant." },
+  returns: { title: "Returns", text: "Return window, which items qualify and who pays return shipping: to confirm with the merchant." },
+  privacy: { title: "Privacy", text: "How this store handles your personal data: to confirm with the merchant." },
+  terms: { title: "Terms", text: "Terms of sale, including how tax is handled: to confirm with the merchant." },
 };
 
 /** The footer every page shows: links to the four policy pages. */
@@ -133,9 +135,23 @@ ${kit.renderProductJsonLd(product, request)}
 ${image ? `<img src="${escape(image)}" alt="${escape(product.title)}" width="480">` : ""}
 <p>${escape(product.description)}</p>
 <p>${money(product.from_price.amount, product.from_price.currency)}</p>
-<a href="/checkout?product=${encodeURIComponent(product.merchant_product_id)}&quantity=1">Buy now</a>
+<form method="post" action="/cart"><input type="hidden" name="product" value="${escape(product.merchant_product_id)}">
+<input type="number" name="quantity" value="1" min="1" max="99" aria-label="Quantity"> <button type="submit">Buy now</button></form>
 ${footer()}
 </body></html>`);
+  });
+
+  // "Buy now": the form posts here, and a 303 sends the shopper to checkout.
+  // kit.redirect(request, path) builds the Location on this request's validated store
+  // address. Never build a Location from req.url or a Web request.url: a dev
+  // server bound to 0.0.0.0 can name that bind address, which no browser opens.
+  app.post("/cart", express.urlencoded({ extended: false, limit: "8kb" }), (req, res) => {
+    const product = getProduct(String(req.body?.product ?? ""));
+    if (!product) return res.status(404).send("Not found");
+    const quantity = Math.min(99, Math.max(1, Math.trunc(Number(req.body?.quantity) || 1)));
+    const query = new URLSearchParams({ product: product.merchant_product_id, quantity: String(quantity) });
+    const seeOther = kit.redirect(webRequest(req), `/checkout?${query}`);
+    res.status(seeOther.status).set("cache-control", "no-store").location(seeOther.headers.get("location")).end();
   });
 
   // The policy pages the footer links to.

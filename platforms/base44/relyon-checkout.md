@@ -7,13 +7,27 @@
 
 These seven rules are identical in every Relyon skill. They override anything else you read.
 
-1. Install `@relyon/store-kit@0.1.5` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.6` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
 5. Agent activity reporting stays on: never stub, disable or throttle-to-zero the kit's event reporting.
 6. Test/sandbox only. Live is enabled by Relyon staff, never by the agent. Build before requesting keys: missing credentials defer credential-dependent verification, never the store build. Show checkout as **waiting for sandbox key**, record pending checks honestly, and resume them after configuring a real Test key without rebuilding. Never fabricate a credential, payment or order.
 7. No Relyon-hosted checkout, redirect to a Relyon page, CNAME, proxy, forwarding Worker or `quote.request`/pricing endpoint.
+
+### Test defaults — not merchant policy
+
+| Item | Test default |
+| --- | --- |
+| Brand | Store name, unless the merchant supplies another brand. |
+| MPN | SKU, unless the merchant supplies another MPN. |
+| Stock | Available unless told otherwise; no invented inventory count. |
+| Returns/support | Pending merchant items. Never invent them or submit placeholders as real policy data. |
+
+Explicit merchant facts override these Test defaults. Proceed with local Test
+building; ask before asserting missing merchant promises or syncing policies.
+Never invent supplier claims, GTINs, tax treatment or policy terms. Pending
+merchant information blocks only the checks that require it, not the build.
 <!-- END relyon-store-first-rules -->
 
 ## Building on Base44
@@ -25,7 +39,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   serves the app's pages and can't run the kit's handlers on the store's
   domain paths.
 - **Works in backend functions (untested on Base44 so far):** creating the kit
-  with `npm:@relyon/store-kit@0.1.5`, `priceCart` and `createOrder` reading the
+  with `npm:@relyon/store-kit@0.1.6`, `priceCart` and `createOrder` reading the
   app's Base44 entities, `kit.syncCatalog`, `kit.cardFields`,
   `kit.createPayment` and `kit.reportFulfillment`. Use the two checkout
   functions in the "Checkout on a builder platform" section.
@@ -47,7 +61,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   stop and tell the merchant; don't recreate it.
 
 
-**Step 3 of 6.** Completed prerequisites: `relyon-setup`, `relyon-catalog`; next: `relyon-agents`.
+Reference only. Open a section when the quick start names it; no whole-skill prerequisite.
 
 Contract: the approved public v1 contract dated **2026-10-30**, at
 `https://core.getrelyon.com/v1/openapi.yaml` (another deployment:
@@ -59,10 +73,10 @@ therefore means `https://core.getrelyon.com/api/v1/payments`. The download URL
 above and the store's own routes are separate. Retain operator-confirmed API
 base overrides for other deployments.
 
-**In the Start here flow** (`relyon-setup`) this is step 3, including the Test
-purchase. Wire transactional `createOrder` and read-only `findOrderByPaymentId`
+For the quick start's checkout and Test purchase, wire transactional
+`createOrder` and read-only `findOrderByPaymentId`
 here as checkout prerequisites, not as a deferred placeholder: a successful
-purchase must save its order and safely replay it. Step 5 verifies the broader
+purchase must save its order and safely replay it. The orders reference covers broader
 order recovery and fulfilment behavior. Shipping regions, rates and tax come from the
 merchant: ask, and check what `relyon-store-brief.md` says, but never invent
 them.
@@ -648,7 +662,7 @@ export function createCheckoutFunctions(kit, { priceCart, checkouts, readCart })
 ```
 
 Each platform function creates the kit once per instance (as `relyon-setup`
-shows, with `npm:@relyon/store-kit@0.1.5`), awaits `kit.start()`, and answers with
+shows, with `npm:@relyon/store-kit@0.1.6`), awaits `kit.start()`, and answers with
 `session`, `pay` or `confirm`. A scheduled function calls `reconcile`. The page:
 
 - calls `checkout-session` with the order reference it saved last (if any).
@@ -959,6 +973,36 @@ card fields script can, and marks the element once it is ready:
   addEventListener("relyon-error", (event) => { delete event.target.dataset.relyonReady; }, true);
 </script>
 ```
+
+## Sending the shopper to checkout from the server
+
+A "Buy now" or cart form that posts to the app answers with
+`kit.redirect(request, path)`: a `303 See Other` to `path` (starting with a
+single `/`) on this request's validated store address. Never build that
+Location or a link from `request.url` (for example
+`new URL("/checkout", request.url)`): a dev server bound to every interface
+(`next dev --hostname 0.0.0.0`) hands the app a `request.url` on `0.0.0.0`,
+which no browser can open, so the pay form never appears. In Test the kit
+reads the browser's Host header instead, and only when it names loopback or one
+of the store's hostnames; an unknown Host falls back to the primary hostname.
+A full URL or `//host` as `path` throws.
+
+```ts
+import type { StoreKit } from "@relyon/store-kit";
+declare const kit: StoreKit; // the app's kit (relyon-setup)
+
+// A route that takes a Web Request, such as a Next.js route handler (app/cart/route.ts).
+export async function POST(request: Request): Promise<Response> {
+  const form = await request.formData();
+  const product = String(form.get("product") ?? "");
+  const quantity = Math.min(99, Math.max(1, Math.trunc(Number(form.get("quantity")) || 1)));
+  const query = new URLSearchParams({ product, quantity: String(quantity) });
+  return kit.redirect(request, `/checkout?${query}`);
+}
+```
+
+With Express, pass `webRequest(req)` (see `express-server.md`) and send the
+answer's status and `Location`.
 
 The page's own script (served by the app as `/checkout.js`):
 
