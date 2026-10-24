@@ -12,7 +12,7 @@ Merchant prompt:
 Build my store: <your store idea>. Use Relyon Core: run npx @relyon/store-kit init and follow the Relyon skills.
 ```
 
-This package is the Relyon store kit, version `0.1.4`, plus the six Relyon skills in
+This package is the Relyon store kit, version `0.1.5`, plus the six Relyon skills in
 `skills/` next to this file: `relyon-setup`, `relyon-catalog`, `relyon-checkout`, `relyon-agents`,
 `relyon-orders` and `relyon-go-live`.
 
@@ -63,7 +63,9 @@ reported honestly in the hand-over.
 Protocol limits: UCP Test checkout is implemented. ACP Test integration is
 implemented with merchant-domain forwarding, ChatGPT credentials, application
 and channel prerequisites; it is not unrestricted native ChatGPT availability.
-Store-hosted MCP checkout returns `protocol_not_available`. Separate Commerce
+Store-hosted MCP checkout works in Test by handing the shopper off to the
+store's checkout page (an `ord_` order); in Live it returns
+`protocol_not_available`. Separate Commerce
 MCP supports checkout-link handoff, not direct charging. No Live availability
 or platform approval is promised.
 

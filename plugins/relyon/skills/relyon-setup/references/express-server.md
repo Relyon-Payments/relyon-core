@@ -1,7 +1,8 @@
 # Express server with the store kit
 
-A complete Express 5 app: the kit's routes, a product page, the checkout page
-on the store's domain, and the pay, confirm and order status routes.
+A complete Express 5 app: the kit's routes, a homepage with the product list,
+a product page, the policy pages its footer links to, the checkout page on the
+store's domain, and the pay, confirm and order status routes.
 `store.js` is in the `relyon-catalog` skill (`references/example-store.md`),
 `relyon.js` is in this skill's `SKILL.md`, and `checkout-flow.js` (the
 server's checkout records) and `checkout.js` (the browser script) are in the
@@ -15,21 +16,45 @@ import express from "express";
 import { PaymentUnavailableError, StoreRefusal } from "@relyon/store-kit";
 import { storeKitMiddleware } from "@relyon/store-kit/express";
 import { createCheckoutFlow, memoryCheckouts } from "./checkout-flow.js";
-import { findOrderByPayment, getProduct, priceCart } from "./store.js";
+import { catalogSource, findOrderByPayment, getProduct, priceCart } from "./store.js";
 
 const escape = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const money = (amount, currency) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount / 100);
 
-/** The Web Request the kit's helpers read, built from an Express request. */
+/**
+ * The Web Request the kit's helpers read, built from an Express request.
+ * The kit only trusts its Host when it is one of the store's own or Test
+ * preview hostnames; plain http is used for loopback (localhost) only.
+ */
 export function webRequest(req) {
   const headers = new Headers();
   for (const [name, value] of Object.entries(req.headers)) {
     if (typeof value === "string") headers.set(name, value);
     else if (Array.isArray(value)) for (const item of value) headers.append(name, item);
   }
-  return new Request(`https://${req.headers.host ?? "localhost"}${req.originalUrl}`, { method: req.method, headers });
+  const host = req.headers.host ?? "localhost";
+  const loopback = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host);
+  const scheme = loopback && !req.socket?.encrypted ? "http" : "https";
+  return new Request(`${scheme}://${host}${req.originalUrl}`, { method: req.method, headers });
 }
+
+/**
+ * The policy pages the homepage footer links to. Write them from the
+ * merchant's own answers (relyon-setup: "Ask before publishing claims").
+ * Until the merchant confirms a fact, the page says "to confirm" rather than
+ * inventing a return window, a return cost, tax handling or a brand claim.
+ */
+export const POLICY_PAGES = {
+  shipping: { title: "Shipping", text: "Where we ship, delivery times and costs: to confirm with the store owner." },
+  returns: { title: "Returns", text: "Return window, which items qualify and who pays return shipping: to confirm with the store owner." },
+  privacy: { title: "Privacy", text: "How this store handles your personal data: to confirm with the store owner." },
+  terms: { title: "Terms", text: "Terms of sale, including how tax is handled: to confirm with the store owner." },
+};
+
+/** The footer every page shows: links to the four policy pages. */
+const footer = () => `<footer><nav aria-label="Store policies">${Object.entries(POLICY_PAGES)
+  .map(([path, page]) => `<a href="/${path}">${escape(page.title)}</a>`).join(" · ")}</nav></footer>`;
 
 /** One cookie value from the request, or null. */
 const cookie = (req, name) => {
@@ -65,26 +90,63 @@ export function createApp(kit, { checkouts = memoryCheckouts() } = {}) {
   // Run app.locals.reconcile() on a timer: replays payments still being confirmed.
   app.locals.reconcile = (options) => flow.reconcile(options);
   // 1. The kit first: it needs the raw body of its own routes. It serves the
-  // discovery files too: /.well-known/ucp, /llms.txt, /sitemap-products.xml
-  // and the root sitemap index /sitemap.xml (sitemapIndex: false turns that
-  // off when the app has its own /sitemap.xml).
+  // discovery files too: /.well-known/ucp, /.well-known/agent-card.json,
+  // /llms.txt, /sitemap-products.xml, the selected feeds and the root sitemap
+  // /sitemap.xml, a urlset of the product pages (sitemapIndex: false turns
+  // that off when the app has its own /sitemap.xml).
   app.use(storeKitMiddleware(kit));
   // 2. Then the app's own parsers, static files and routes.
   app.use(express.json({ limit: "64kb" }));
   app.use(express.static("public")); // serves public/checkout.js
 
-  // A product page the app renders from its own data.
+  // The homepage: the product list with its Product data, the discovery links
+  // agents look for in <head> (llms.txt, UCP, MCP, ACP, the agent card, the
+  // sitemap and the feeds) and the policy footer. Every link uses the store's
+  // public address for this request (kit.publicOrigin), never a dev address.
+  app.get("/", async (req, res) => {
+    const request = webRequest(req);
+    kit.recordCrawlerVisit(request, 200, { ip: req.ip });
+    const { products } = await catalogSource.listProducts({ limit: 100 });
+    res.type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Example Candle Co</title>
+${kit.renderDiscoveryLinks(request)}
+${kit.renderProductListJsonLd(products, request)}
+</head><body>
+<h1>Example Candle Co</h1>
+<ul>${products.map((product) => `<li><a href="/products/${encodeURIComponent(product.merchant_product_id)}">${escape(product.title)}</a>
+ ${money(product.from_price.amount, product.from_price.currency)}${product.availability === "in_stock" ? "" : " (out of stock)"}</li>`).join("")}</ul>
+${footer()}
+</body></html>`);
+  });
+
+  // A product page the app renders from its own data. Pass the request so the
+  // Product data's links and images use the public address.
   app.get("/products/:id", (req, res) => {
+    const request = webRequest(req);
     const product = getProduct(req.params.id);
-    kit.recordCrawlerVisit(webRequest(req), product ? 200 : 404, { ip: req.ip });
+    kit.recordCrawlerVisit(request, product ? 200 : 404, { ip: req.ip });
     if (!product) return res.status(404).send("Not found");
-    res.type("html").send(`<!doctype html><meta charset="utf-8"><title>${escape(product.title)}</title>
-${kit.renderProductJsonLd(product)}
+    const image = kit.productJsonLd(product, request).image?.[0];
+    res.type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escape(product.title)}</title>
+${kit.renderProductJsonLd(product, request)}
+</head><body>
 <h1>${escape(product.title)}</h1>
+${image ? `<img src="${escape(image)}" alt="${escape(product.title)}" width="480">` : ""}
 <p>${escape(product.description)}</p>
 <p>${money(product.from_price.amount, product.from_price.currency)}</p>
-<a href="/checkout?product=${encodeURIComponent(product.merchant_product_id)}&quantity=1">Buy now</a>`);
+<a href="/checkout?product=${encodeURIComponent(product.merchant_product_id)}&quantity=1">Buy now</a>
+${footer()}
+</body></html>`);
   });
+
+  // The policy pages the footer links to.
+  for (const [path, page] of Object.entries(POLICY_PAGES)) {
+    app.get(`/${path}`, (req, res) => {
+      res.type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escape(page.title)}</title></head><body>
+<h1>${escape(page.title)}</h1><p>${escape(page.text)}</p>
+${footer()}
+</body></html>`);
+    });
+  }
 
   // The checkout page, on the store's own domain.
   app.get("/checkout", async (req, res) => {
@@ -161,7 +223,7 @@ ${kit.renderProductJsonLd(product)}
 <ul>${cart.lines.map((line) => `<li>${escape(line.title)} × ${line.quantity}: ${money(line.amount, cart.currency)}</li>`).join("")}</ul>
 <p>Subtotal ${money(t.subtotal, t.currency)} · Discount ${money(t.discount, t.currency)} · Shipping ${money(t.shipping, t.currency)} · Tax ${money(t.tax, t.currency)}</p>
 <p><strong>Total ${money(t.total, t.currency)}</strong></p>
-<form id="pay" data-order-reference="${escape(orderReference)}">
+<form id="pay" data-order-reference="${escape(orderReference)}" data-new-checkout="${escape(`/checkout?${again}`)}">
 <script>
   // Ready latch (relyon-checkout's checkout-page.md): before the card fields, so it never misses "relyon-ready".
   addEventListener("relyon-ready", (event) => { event.target.dataset.relyonReady = "true"; }, true);
@@ -198,17 +260,31 @@ ${fields.html}
 }
 ```
 
-Start it and stop cleanly. No catalog sync is needed for source-backed feeds:
+Start it and stop cleanly. Source-backed discovery and feeds need no sync,
+but Relyon's agent checkout (MCP, UCP and ACP) only buys products it has in
+the store's Relyon catalog, so the starter sends them once a key is set:
 
 ```js main.js
 import { createRelyonKit } from "./relyon.js";
 import { createApp } from "./server.js";
 import { loadTestConfig } from "@relyon/store-kit/server-config";
+import { listProducts } from "./store.js";
 
 const privateConfig = await loadTestConfig({ project: process.cwd() });
-const kit = createRelyonKit({ env: { ...process.env, ...(privateConfig.apiKey ? { RELYON_API_KEY: privateConfig.apiKey } : {}) } });
+const kit = createRelyonKit({
+  env: { ...process.env, ...(privateConfig.apiKey ? { RELYON_API_KEY: privateConfig.apiKey } : {}) },
+  // A new store has no robots.txt of its own: the kit serves one that lets AI
+  // search and shopping crawlers in and names both sitemaps. An app with its own
+  // robots.txt returns that file's text here instead; the kit keeps every line.
+  robots: { existing: () => "" },
+});
 await kit.start();
-// catalog.source reads the store's database. syncCatalog is an optional mirror only.
+// catalog.source serves discovery and feeds from the store's database. Agent
+// checkout buys only products in the store's Relyon catalog: send them now and
+// again whenever the merchant edits products. A failed sync changes nothing.
+if (kit.checkoutStatus === "ready") {
+  await kit.syncCatalog(await listProducts()).catch((error) => console.error("catalog sync failed", error.message));
+}
 const app = createApp(kit);
 const server = app.listen(Number(process.env.PORT ?? 3000), "0.0.0.0");
 // Payments whose outcome wasn't final are replayed (same Idempotency-Key) until it is.
@@ -224,20 +300,21 @@ process.on("SIGTERM", () => {
 
 ## Sitemaps and robots.txt
 
-The kit answers `/sitemap.xml` with a sitemap index that lists the product
-sitemap:
+The kit answers the root `/sitemap.xml` with a urlset of the product pages
+(the same entries as `/sitemap-products.xml`), on the store's public address:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap><loc>https://shop.example.com/sitemap-products.xml</loc></sitemap>
-</sitemapindex>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://shop.example.com/products/lavender-candle</loc></url>
+  <url><loc>https://shop.example.com/products/candle-trio</loc></url>
+</urlset>
 ```
 
 With the kit's `robots` option (`existing()` returns the app's own
 robots.txt), the merged file keeps every original line and adds the AI
-discovery section, ending with a `Sitemap:` line for the index and one for
-the product sitemap:
+discovery section, ending with a `Sitemap:` line for the root sitemap and one
+for the product sitemap:
 
 ```text
 Sitemap: https://shop.example.com/sitemap.xml
@@ -245,8 +322,13 @@ Sitemap: https://shop.example.com/sitemap-products.xml
 # llms.txt: https://shop.example.com/llms.txt
 ```
 
-Without the `robots` option, add those two `Sitemap:` lines to the app's own
-robots.txt by hand.
+The starter's `main.js` turns this on with `robots: { existing: () => "" }`
+because a new store has no robots.txt of its own. Some hosts and tunnels add
+their own robots.txt rules in front of the app's (blocking AI crawlers by
+default); the kit's explicit `Allow: /` groups for AI search and shopping
+crawlers still apply, but check the host's bot settings too. Without the
+`robots` option, add those two `Sitemap:` lines to the app's own robots.txt by
+hand.
 
 ## On the preview address
 

@@ -86,8 +86,16 @@ export const catalogSource = {
   },
 };
 
+/**
+ * Products for Relyon's index, which agent checkout buys from: the same facts
+ * as the source, including the merchant-supplied brand and MPN that Google and
+ * ChatGPT checkout require, without the kit-only feed block.
+ */
 export async function listProducts() {
-  return PRODUCTS.map(indexProduct);
+  return PRODUCTS.map((product) => {
+    const { feed, ...indexed } = sourceProduct(product);
+    return indexed;
+  });
 }
 
 /** One product for the app's product page: the same source-backed facts the feeds carry, so its JSON-LD has the same brand and MPN. */
@@ -169,7 +177,7 @@ export async function createOrder(cart, payment) {
   const order = {
     id: `order_${orders.size + 1}`,
     paymentId: payment.id,
-    // Relyon's order ID (ord_…) for agent checkouts, used to report fulfillment.
+    // Relyon's order ID (ord_…), for agent checkouts and the store's own checkout page, used to report fulfillment.
     relyonOrderId: typeof payment.order_id === "string" ? payment.order_id
       : payment.id.startsWith("ord_") ? payment.id : null,
     total: cart.totals.total,

@@ -38,6 +38,8 @@ const orderPending = "Your payment went through. Your order is still being place
 // Payment success is evidence, not a polling status: once known, never forget it.
 let paymentSucceeded = page.dataset.paymentSucceeded === "true";
 let attemptSent = !form;
+// Set once the server says this checkout definitely charged nothing.
+let newCheckoutHref = null;
 function remember(result) {
   if (result.payment_succeeded === true || result.state === "paid") paymentSucceeded = true;
 }
@@ -60,6 +62,21 @@ async function call(path, body) {
 
 function paid(result) {
   window.location.assign(`/orders/thanks?order=${encodeURIComponent(result.order ?? "")}`);
+}
+
+/**
+ * A definite non-charge: `closed`, or `not_found` answering this page's own
+ * Pay request (the server had no checkout, so it sent nothing). This checkout
+ * is over, so Pay is never left stuck. It becomes "Try again", which opens a
+ * new checkout (new order reference) instead of paying here.
+ */
+function offerNewCheckout(message) {
+  status.textContent = message;
+  newCheckoutHref = form?.dataset.newCheckout || "/checkout?new=1";
+  if (button) {
+    button.textContent = "Try again";
+    button.disabled = false;
+  }
 }
 
 /** Keep known success even when a later answer is lost or unreadable. */
@@ -88,9 +105,13 @@ async function confirmOutcome() {
       if (button) button.disabled = false;
       return;
     }
-    if (!paymentSucceeded && (result.state === "closed" || result.state === "not_found")) {
-      status.textContent = result.message; // a reload starts a new checkout
-      return;
+    if (!paymentSucceeded && result.state === "closed") {
+      return offerNewCheckout(result.message); // nothing was charged
+    }
+    if (result.state === "not_found") {
+      // A payment may already have been sent: a missing record is not proof
+      // that nothing was charged. Never offer a new checkout from here.
+      return showPending("We can't find this payment to confirm it. Don't pay again: check your order status or contact the store.");
     }
     showPending(result.state === "pending" ? result.message : "We can't confirm your payment yet. Don't pay again.");
     await sleep(Math.min(30_000, 2_000 * 2 ** Math.min(attempt, 4)));
@@ -108,6 +129,7 @@ if (form) {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (newCheckoutHref) return window.location.assign(newCheckoutHref); // "Try again": a new checkout
     if (attemptSent) return; // late ready events or duplicate submissions cannot start a new attempt
     attemptSent = true;
     button.disabled = true;
@@ -133,8 +155,7 @@ if (form) {
       return;
     }
     if (!paymentSucceeded && (result.state === "closed" || result.state === "not_found")) {
-      status.textContent = result.message; // declined or refused: nothing was charged
-      return;
+      return offerNewCheckout(result.message); // declined or refused: nothing was charged
     }
     // "pending" or no usable answer: the payment may have gone through.
     showPending(result.state === "pending" ? result.message : "We can't confirm your payment yet. Don't pay again.");
@@ -155,11 +176,24 @@ if (form) {
 - `tokenize()` rejects when the card details are incomplete. Nothing was sent,
   so the page lets the shopper fix them and press Pay again.
 - Once `/checkout/pay` was called, Pay is enabled again only when the server
-  says the checkout is still `open` (nothing was sent). A lost connection, a
+  says the checkout is still `open` (nothing was sent). After a definite
+  non-charge (`closed`: declined or refused; or `not_found` as the answer to
+  the Pay request itself, so nothing was sent) the button is never left
+  stuck: it becomes **Try again**, which opens a new checkout
+  (`data-new-checkout` on the form, such as `/checkout?…&new=1`) with a new
+  order reference. It never pays again under the closed reference, and it is
+  never offered while a payment may have gone through. A lost connection, a
   timeout, a `5xx` or a `pending` answer means the payment may have gone
   through: the page says so, links to the order status page and keeps asking
   `/checkout/confirm`. It never says "didn't go through" unless the server
-  answered `closed`.
+  answered `closed`. A `not_found` from `/checkout/confirm` (after a payment
+  may have been sent, for example when the server lost its record) is not
+  proof of a non-charge: Pay stays disabled with the status link and no
+  **Try again**.
+- The page never reloads itself. It polls `/checkout/confirm` with `fetch`
+  and stops on a final answer; calling `location.reload()` from a status
+  answer (or a status page that sends the browser back to itself) is how a page
+  reload loop starts.
 - A reload while a payment is being confirmed shows the order status page
   (the server remembers the shopper's order reference), not new card fields,
   so it can't start a second payment.
