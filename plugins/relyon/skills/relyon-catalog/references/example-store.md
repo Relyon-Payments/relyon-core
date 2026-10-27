@@ -17,7 +17,7 @@ with integer math, so the totals always add up exactly.
 // The app's own store logic. Relyon never prices a cart; this module does.
 import { StoreRefusal } from "@relyon/store-kit";
 
-const PRIMARY_HOSTNAME = (process.env.STORE_HOSTNAMES ?? process.env.STORE_HOSTNAME ?? "shop.example.com")
+const PRIMARY_HOSTNAME = (process.env.STORE_HOSTNAMES ?? process.env.STORE_HOSTNAME ?? "localhost")
   .split(",").map(host => host.trim()).filter(Boolean)[0];
 if (!PRIMARY_HOSTNAME) throw new Error("Configure at least one store hostname");
 const ORIGIN = process.env.STORE_PUBLIC_URL ?? `https://${PRIMARY_HOSTNAME}`;

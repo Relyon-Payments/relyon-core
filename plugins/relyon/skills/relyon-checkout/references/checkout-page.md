@@ -22,6 +22,56 @@ card fields script can, and marks the element once it is ready:
 </script>
 ```
 
+## Checkout page marker
+
+Put `data-relyon-cart-items` on one element of the checkout page, set to the
+number of items in the cart, including `0` for an empty cart:
+
+```html
+<main id="checkout" data-relyon-cart-items="2"> … </main>
+```
+
+Render it in both states: an empty checkout shows the page with
+`data-relyon-cart-items="0"` (do not send the shopper on to the cart or the home
+page). `npx @relyon/store-kit doctor` requires this marker, or the kit's
+`<relyon-card-fields>` mount, on the checkout page; landing on the home page
+or a 200 placeholder is NOT DONE. In Test, doctor also transfers a real item
+through `POST /ucp/carts`, opens the `continue_url` and requires
+`data-relyon-cart-items` with a non-empty cart (card fields alone don't show
+that the item landed). The attribute is `CHECKOUT_CART_ITEMS_ATTRIBUTE` and
+`cartItemCount(inputs)` counts the items. Do not reuse
+`data-relyon-checkout`; the WebMCP script uses it.
+
+## Transferred carts and hand-offs: `kit.landing()`
+
+A Google cart transfer's `continue_url` (`?relyon_transfer=…`) and an agent
+hand-off link (`?relyon_cart=…`) both land on the checkout page. Call
+`kit.landing()` there and, when it returns `inputs`, show that cart: its
+lines carry each product ID, quantity and, for a variant, its `options`.
+`landing()` takes the page's `Request`, its URL (a `URL` or path string),
+`URLSearchParams`, or a Next.js `searchParams` object, so a server component
+can call it directly:
+
+```ts
+import { CHECKOUT_CART_ITEMS_ATTRIBUTE, cartItemCount, type StoreKit } from "@relyon/store-kit";
+declare const kit: StoreKit; // the app's kit (relyon-setup), server only
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+// app/checkout/page.tsx (a server component). Next.js 15 and 16 pass searchParams as a Promise.
+// Render <main {...marker}> around the cart; with Express pass kit.landing(webRequest(req)).
+export async function landedCheckout(searchParams: SearchParams) {
+  const landing = await kit.landing(await searchParams);
+  const items = cartItemCount(landing.inputs); // 0 when nothing landed: show the app's own cart
+  return { landing, items, marker: { [CHECKOUT_CART_ITEMS_ATTRIBUTE]: String(items) } };
+}
+```
+
+Links minted by store kit 0.1.10 carry no options; they still land, and a
+variant feed ID in them is mapped to its product plus that variant's options.
+A transfer landing is never attributed (no agent checkout): take the cart from
+`landing.inputs` and charge it through the app's own checkout.
+
 ## Sending the shopper to checkout from the server
 
 A "Buy now" or cart form that posts to the app answers with

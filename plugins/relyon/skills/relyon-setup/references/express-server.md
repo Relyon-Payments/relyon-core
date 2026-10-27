@@ -278,7 +278,10 @@ ${fields.html}
 
 Start it and stop cleanly. Source-backed discovery and feeds need no sync,
 but Relyon's agent checkout (MCP, UCP and ACP) only buys products it has in
-the store's Relyon catalog, so the starter sends them once a key is set:
+the store's Relyon catalog, so the starter sends them once a key is set.
+A plain Node/Express server doesn't read `.env` by itself: `loadTestConfig()`
+below loads the Test key init saved (or use `dotenv`). Never cat or print
+`.env`, and never paste the key into a command.
 
 ```js main.js
 import { createRelyonKit } from "./relyon.js";
@@ -289,10 +292,9 @@ import { listProducts } from "./store.js";
 const privateConfig = await loadTestConfig({ project: process.cwd() });
 const kit = createRelyonKit({
   env: { ...process.env, ...(privateConfig.apiKey ? { RELYON_API_KEY: privateConfig.apiKey } : {}) },
-  // A new store has no robots.txt of its own: the kit serves one that lets AI
-  // search and shopping crawlers in and names both sitemaps. An app with its own
-  // robots.txt returns that file's text here instead; the kit keeps every line.
-  robots: { existing: () => "" },
+  // robots.txt is served by default (AI search and shopping crawlers allowed,
+  // both sitemaps named). An app with its own robots.txt passes
+  // robots: { existing: () => itsText } so every line is kept; robots: false opts out.
 });
 await kit.start();
 // catalog.source serves discovery and feeds from the store's database. Agent
@@ -327,10 +329,10 @@ The kit answers the root `/sitemap.xml` with a urlset of the product pages
 </urlset>
 ```
 
-With the kit's `robots` option (`existing()` returns the app's own
-robots.txt), the merged file keeps every original line and adds the AI
-discovery section, ending with a `Sitemap:` line for the root sitemap and one
-for the product sitemap:
+The kit serves `/robots.txt` by default. With `robots: { existing }`
+(`existing()` returns the app's own robots.txt), the merged file keeps every
+original line and adds the AI discovery section. Either way it ends with a
+`Sitemap:` line for the root sitemap and one for the product sitemap:
 
 ```text
 Sitemap: https://shop.example.com/sitemap.xml
@@ -338,12 +340,14 @@ Sitemap: https://shop.example.com/sitemap-products.xml
 # llms.txt: https://shop.example.com/llms.txt
 ```
 
-The starter's `main.js` turns this on with `robots: { existing: () => "" }`
-because a new store has no robots.txt of its own. Some hosts and tunnels add
+A new store has no robots.txt of its own, so the starter's `main.js` uses the
+default. An Express app with its own robots route mounted after the kit must
+pass `robots: { existing }` or `robots: false`, or the kit's answer shadows it.
+Some hosts and tunnels add
 their own robots.txt rules in front of the app's (blocking AI crawlers by
 default); the kit's explicit `Allow: /` groups for AI search and shopping
-crawlers still apply, but check the host's bot settings too. Without the
-`robots` option, add those two `Sitemap:` lines to the app's own robots.txt by
+crawlers still apply, but check the host's bot settings too. With
+`robots: false`, add those two `Sitemap:` lines to the app's own robots.txt by
 hand.
 
 ## On the preview address

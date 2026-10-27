@@ -1,3 +1,5 @@
+First read the relyon-setup skill (.agents/skills/relyon-setup/SKILL.md, .claude/skills/relyon-setup/SKILL.md or .cursor/skills/relyon-setup/SKILL.md).
+
 # Relyon Core quick start — Test only
 
 Do not read dist files, framework docs, or the full README.
@@ -11,13 +13,29 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.6` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.12` and references.
+Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
+`.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
-options. Conflicts write nothing: compare/add the manual pointer or preserve
-edits before `--force`. Never bypass symlink/marker refusals.
+options. AGENTS.md, CLAUDE.md and replit.md get the Relyon blocks (a pointer and
+a "definition of done") created or appended; other
+conflicts write nothing: compare or preserve edits before `--force`. Never
+bypass symlink/marker refusals.
+
+With no key, init creates one Test sandbox and saves it privately (outside the
+app and every git tree), sets `RELYON_API_KEY` in `.env` (0600, gitignored)
+and prints only what happened. Never read or print the private files, nor the
+ownership-link file it names: that is the merchant's. If init prints the
+get-key URL and `init --key-from-stdin`, keep building. Only after building,
+if checkout still waits, give the merchant those two lines; the merchant
+pastes the key into that command. Example env files: `RELYON_API_KEY=` (blank; init
+fills it). A placeholder value counts as no key. The `.env` Test key is readable
+by any coding agent in the project, and remixes, forks and exports copy it:
+tell the merchant. In CI or with no terminal, init creates no sandbox unless
+`RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.6`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.12`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -48,20 +66,24 @@ import { createStoreKit } from "@relyon/store-kit";
 import { storeKitMiddleware } from "@relyon/store-kit/express";
 // options: store callbacks, durable adapters, server-only configuration.
 const kit = createStoreKit(options);
-app.use(storeKitMiddleware(kit)); // before body parsing/auth/static fallback
+app.use(storeKitMiddleware(kit)); // before body parsing/auth/static/SPA catch-all
 app.use(express.json());
 ```
 
+Mount the kit always; it waits safely without a key. Never wrap
+`createStoreKit`/`storeKitMiddleware` in a check on `RELYON_API_KEY`.
+Next.js 15/16 App Router: use setup's
+[App Router reference](../../relyon-setup/references/next-app-router.md); add no
+`export const runtime`/`dynamic` (Next 16 `cacheComponents` refuses them).
+
 Checkout stays on-store: only Relyon's card fields enter the browser.
 Never collect card data in app code/logs or add payment intermediaries.
-Automatic Test setup needs `RELYON_PRIVATE_DIR`: existing owner-only 0700 POSIX
-directory outside the app/every git tree, never public/static.
 Never blindly retry provisioning; preserve keys.
-Node servers can use `loadTestConfig({ project: process.cwd() })` from
-`@relyon/store-kit/server-config`.
-No safe setup? Build with **waiting for sandbox key**, never a fake key.
-Only after building, if still waiting, send the merchant to
-https://core.getrelyon.com/get-sandbox-key and host secret tooling.
+Plain Node/Express servers don't read `.env`: load the key with
+`await loadTestConfig({ project: process.cwd() })` from
+`@relyon/store-kit/server-config` (environment, private folder, then `.env`) or
+dotenv. Never cat or print `.env`; never paste the key into a command.
+No key yet? Kit routes answer `waiting_for_sandbox_key`; never a fake key.
 Never request, print, log or commit credentials/claim URLs.
 Restart with a real Test key; resume checks without rebuilding.
 
@@ -82,8 +104,8 @@ With a key run `await kit.start()` then `kit.syncCatalog(products)` and after ed
 Source discovery needs no sync.
 
 Use agents' [UCP/ACP/MCP routes](../../relyon-agents/SKILL.md#what-the-kit-serves-on-the-stores-domain).
-Preserve merchant restrictions with
-[robots merge](../../relyon-catalog/SKILL.md#robots-explicit-conflict-safe-opt-in).
+The kit serves `/robots.txt` by default (`robots: false` opts out); keep an
+existing policy with the [robots merge](../../relyon-catalog/SKILL.md#robots-served-by-default-conflict-safe).
 Feed export/discovery is not channel approval or permission to buy.
 
 ## 4. Store-owned checkout
@@ -95,7 +117,7 @@ Price server-stored carts; show lines/shipping/tax/discounts/total.
 Use server `kit.cardFields(...)`, browser `tokenize()`, then server
 `kit.createPayment(...)` for the unchanged displayed total.
 Use [payment compatibility](../../relyon-checkout/SKILL.md#createpayment-charge-the-stores-total):
-retain `paymentCartFormat: "server-legacy"`.
+leave `paymentCartFormat` unset (`server-legacy` is deprecated).
 Use `kit.landing(request)`'s trusted channel, never a browser channel.
 Keep a stable private cart-token secret.
 
@@ -109,7 +131,7 @@ Keep orders unique on payment ID. Implement every
 
 ## 5. Doctor — inspect actual findings
 
-Set the running `STORE_PUBLIC_URL` (loopback allows HTTP/its port):
+Run it with or without a key. Set the running `STORE_PUBLIC_URL` (loopback allows HTTP/its port):
 
 ```sh
 npx --no-install @relyon/store-kit doctor --url "$STORE_PUBLIC_URL"
@@ -118,17 +140,32 @@ npx --no-install @relyon/store-kit doctor --url "$STORE_PUBLIC_URL"
 Remote: HTTPS, `RELYON_PREVIEW_HOSTS` when needed. Do not publish to reach doctor.
 Read
 [diagnostics](../../relyon-setup/SKILL.md#diagnose-without-overclaiming)
-Read every line: reaching doctor/exit zero is not all checks passed. Fix store
+Doctor FAILs a kit route answered by the app's catch-all page and a server
+answering 200 for unknown paths, and WARNs on a kit gated on `RELYON_API_KEY`.
+The first line says `DONE` or `NOT DONE`; you are done only at DONE (exit 0;
+2 NOT DONE, 1 any FAIL). Do the "Do this next" steps in order and rerun. Fix store
 failures; record credential/policy/webhook/channel/runtime blockers verbatim.
 Never invent statuses or deselect required feeds to pass.
-Policy sync needs merchant approval, never a checkout side effect.
+Policy sync needs merchant approval, never a checkout side effect. Test policy
+URLs may be plain http on the loopback host; Live requires https.
 Use [store policies](../../relyon-setup/SKILL.md#store-policies-explicit-synchronization)
 and [webhook setup](../../relyon-agents/SKILL.md#agent-rules) when prerequisites
 exist. Handle one-time secrets privately; never sync placeholders.
 
 ## 6. Genuine Test purchase
 
-Use checkout's [Test purchases](../../relyon-checkout/SKILL.md#test-purchases-end-to-end).
+You run this; it is not a step for a person. With the server running on its
+Test key:
+
+```sh
+npx --no-install @relyon/store-kit test-checkout --url "$STORE_PUBLIC_URL"
+```
+
+It buys one product once through the kit's Test-only route (mock processor
+token, no card data, the store's own `priceCart`/`createOrder`), waits for
+Relyon's confirmation, then says to rerun doctor. Refused in Live. If it says
+the Test processor isn't the mock one, buy on the store page instead:
+use checkout's [Test purchases](../../relyon-checkout/SKILL.md#test-purchases-end-to-end).
 Buy on the store page, never a real card. Mock fields collect no card data;
 processor-backed Test uses that processor's published test cards only.
 Record displayed total, actual `pay_` ID, `livemode: false`, succeeded status
@@ -157,3 +194,5 @@ Agents never enable Live or promise approval. Retain all security safeguards.
 | --- | --- |
 | Reporting | [Agent events](../../relyon-agents/SKILL.md#agent-activity-reporting-stays-on) |
 | Order recovery | [Paid but unsaved](../../relyon-orders/SKILL.md#paid-but-the-order-is-not-saved) |
+
+Finish with `npx @relyon/store-kit doctor` and fix every FAIL.
