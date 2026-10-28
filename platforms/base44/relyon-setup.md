@@ -7,7 +7,7 @@
 
 These seven rules are identical in every Relyon skill. They override anything else you read.
 
-1. Install `@relyon/store-kit@0.1.13` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.14` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -39,7 +39,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   serves the app's pages and can't run the kit's handlers on the store's
   domain paths.
 - **Works in backend functions (untested on Base44 so far):** creating the kit
-  with `npm:@relyon/store-kit@0.1.13`, `priceCart` and `createOrder` reading the
+  with `npm:@relyon/store-kit@0.1.14`, `priceCart` and `createOrder` reading the
   app's Base44 entities, `kit.syncCatalog`, `kit.cardFields`,
   `kit.createPayment` and `kit.reportFulfillment`. Use the two checkout
   functions in the "Checkout on a builder platform" section.
@@ -78,6 +78,10 @@ purchases; missing credentials
 defer credential-dependent checks, not local building. Pending is not passed.
 Agents never enable Live. No particular task tool is required.
 
+## On Replit
+
+Get your Test key from the Relyon dashboard and add RELYON_API_KEY in Replit Secrets before setup; never paste keys in chat.
+
 ## Facts at a glance
 
 **Relyon's API base URL** is `https://core.getrelyon.com/api`. Every
@@ -101,7 +105,7 @@ all the names involved:
 | Name | Read by | Secret | What it is |
 | --- | --- | --- | --- |
 | `RELYON_API_KEY` | the app (`relyon.apiKey`), the kit's doctor, the `relyon` CLI | yes | The sandbox's `restrictedKey` (`rly_test_…`). Example env files show it blank (`RELYON_API_KEY=`): init fills it. A placeholder value counts as no key. |
-| `RELYON_PRIVATE_DIR` | init, the Node server-config loader, the kit's doctor | private path | Optional. An existing owner-only 0700 POSIX directory outside the app and every git tree. Default: an owner-only folder per project under `$XDG_CONFIG_HOME/relyon` or `~/.config/relyon`. |
+| `RELYON_PRIVATE_DIR` | init, the Node server-config loader, the kit's doctor | private path | Optional. An existing owner-only 0700 POSIX directory outside the app and every git tree. Default: the first usable of `$XDG_CONFIG_HOME/relyon/<project>` and `~/.config/relyon/<project>`; a candidate inside the app or a git tree is skipped before anything is created. |
 | `RELYON_WEBHOOK_SECRET` | the app (`rules.webhookSecret`) | yes | Optional override: the one-time `secret` from registering the store's webhook endpoint. Unset in Test, the kit resolves it at runtime from `RELYON_API_KEY`. |
 | `RELYON_CART_TOKEN_SECRET` | the app (`cartTokens.secret`) | yes | A store-generated secret for hand-off cart tokens; stable across processes and key rotation. |
 | `DATABASE_URL` | the app (durable state, orders) | yes | The store's database connection string. |
@@ -124,14 +128,30 @@ usable key (unset, blank or a placeholder such as `your_key_here`,
 `RELYON_LIVE=true` turns this off) on Node/POSIX:
 
 - The key is saved in an owner-only (0700) private folder outside the app and
-  every git tree: `RELYON_PRIVATE_DIR` when set, otherwise one folder per
-  project under `$XDG_CONFIG_HOME/relyon` (or `~/.config/relyon`). The key
-  file is 0600.
-- Init also sets `RELYON_API_KEY` in the project's `.env` (0600), first making
+  every git tree: `RELYON_PRIVATE_DIR` when set, otherwise the first usable of
+  `$XDG_CONFIG_HOME/relyon/<project>` and `~/.config/relyon/<project>` — a
+  candidate that would sit inside the app or a git tree is skipped before
+  anything is created, and if no location is usable init names the refused
+  path, the reason and a `RELYON_PRIVATE_DIR=<dir>` remedy. The key file is
+  0600.
+- If `RELYON_API_KEY` is in the environment, init uses it and writes no key file.
+  Only when it is missing does the local-development flow run.
+- For local development, init sets `RELYON_API_KEY` in the project's `.env` (0600), first making
   sure `.gitignore` lists `.env`, and refuses (saying why) when `.env` is
   tracked by git. A deploy that doesn't carry the home folder still gets the
   key from `.env` or the host's secret settings. When the project has a
   `.dockerignore`, init makes sure it lists `.env` too.
+- Before publishing, add `RELYON_API_KEY` in the host's environment settings.
+  Doctor warns on every host when the key comes only from a saved file,
+  including `.env.local` and `.env.production`. This is advisory, not a FAIL.
+  In Test the kit resolves the webhook signing secret itself at runtime.
+- With an environment API key, `webhook` and init's best-effort registration
+  write no file, including after `--rotate`. Only a local file key saves
+  `RELYON_WEBHOOK_SECRET` to gitignored `.env` (0600, never printed).
+  An environment `RELYON_WEBHOOK_SECRET` is an optional explicit override;
+  unset or update it after rotation to use the new signing secret.
+- After publishing, run `npx @relyon/store-kit webhook --url <published https origin>`,
+  then rerun doctor against that origin. The same steps apply on every host.
 - The `.env` Test key is readable by any coding agent working in the project,
   and remixes, forks and exports of the project carry `.env` with them. Tell the
   merchant; a Test key moves no money, but treat it as private and rotate it
@@ -151,7 +171,9 @@ usable key (unset, blank or a placeholder such as `your_key_here`,
   second sandbox. Never delete it to retry.
 
 When provisioning can't run (offline, rate-limited, no usable private
-location, or `RELYON_LIVE=true`), init prints exactly one URL and one command:
+location, or `RELYON_LIVE=true`), init prints exactly one URL and one command
+(a refused private location also names the refused path, the reason and the
+`RELYON_PRIVATE_DIR` remedy, before these lines):
 
 ```text
   1) Get a free Test key: https://core.getrelyon.com/get-sandbox-key
@@ -164,12 +186,12 @@ prompt, never an argument), checked to be a Test key, saved the same way and
 never echoed. The owner is needed only for policies, the support contact and
 Live approval.
 
-**pnpm and Replit workspaces.** In a pnpm workspace (a `pnpm-workspace.yaml`
+**pnpm workspaces.** In a pnpm workspace (a `pnpm-workspace.yaml`
 at or above the app), the kit belongs in the package that runs the store's
 server, never the workspace root. Run `init` from the project root: when the
 workspace has exactly one server package it installs there; otherwise it
 skips the install and prints the exact command to run, such as
-`pnpm --filter <server package> add --save-exact @relyon/store-kit@0.1.13`.
+`pnpm --filter <server package> add --save-exact @relyon/store-kit@0.1.14`.
 It still copies the skills to the project root. Running `init` inside the
 server package installs into that package.
 
@@ -267,7 +289,6 @@ default) adds one Relyon stop hook to `.claude/settings.json` (Claude Code
 entry, and writes nothing if a file isn't valid JSON. When the agent tries to
 stop while doctor says NOT DONE, the hook sends the steps back, at most 3 times
 per session; it allows the stop on any internal error and never prints a key.
-Replit Agent has no hooks: it reads the definition of done in `replit.md`.
 
 Codex CLI: init writes no Codex configuration. To add the hook by hand, put a
 `Stop` entry in the project's `.codex/hooks.json` (or `~/.codex/hooks.json`),
@@ -371,25 +392,6 @@ passed.
 
 ## Platform notes
 
-- **Replit Agent.** The merchant starts with a prompt in a new Replit App
-  (prompt-first: "Build my store: … Use Relyon Core: run
-  `npx @relyon/store-kit init` and follow the Relyon skills"). Run `init` in
-  the Shell; Replit Agent reads `.agents/skills` and `AGENTS.md`. Keys go in
-  the **Secrets** pane only. Use Replit's built-in Postgres database
-  (`DATABASE_URL`) for products, orders and the kit's durable state. Publish
-  as a **Reserved VM** deployment so the server stays on (see
-  [Replit hosting](#replit-hosting-and-hostname-rotation)). You do the whole
-  flow yourself: run `npx @relyon/store-kit init` (it creates the Test
-  sandbox key), build, publish, run `npx @relyon/store-kit webhook`
-  (re-run it after each publish if the URL changed), then the doctor.
-  The published deployment needs only `RELYON_API_KEY` in Secrets: in Test
-  the kit resolves the webhook signing secret itself at runtime, so
-  `RELYON_WEBHOOK_SECRET` is never needed in Secrets. Never read, print or
-  paste `.env` values — not into Secrets, not into chat. The owner only answers
-  the policy and support-contact questions, approves Live, and presses
-  Publish. After publishing, read
-  the deployment's hostname, set `STORE_HOSTNAMES` and `STORE_PUBLIC_URL`
-  for the deployment, and publish again.
 - **Claude Code.** `init` writes `.claude/skills` and `CLAUDE.md`, which Claude
   Code reads. Or install the plugin:
   `/plugin marketplace add relyon-payments/relyon-core`, then
@@ -496,8 +498,9 @@ another deployment, retain its operator-confirmed API base.
 
 ## Get a Test sandbox
 
-When init could not save a Test key, keep building, then get one yourself:
-open https://core.getrelyon.com/get-sandbox-key and run
+If the key is already in the environment, init uses it without writing a key
+file. When init could not save a local-development Test key, keep building, then
+get one yourself: open https://core.getrelyon.com/get-sandbox-key and run
 `npx @relyon/store-kit init --key-from-stdin`, pasting the key into its
 prompt. The owner is needed only for policies, the support contact and Live
 approval.
@@ -554,16 +557,16 @@ It returns `201` with exactly these fields (values shortened here):
 `npx @relyon/store-kit init` (see [Start here](#start-here-from-the-store-idea-to-a-working-test-store))
 installs the pinned kit and these skills in one step. The manual way follows.
 
-### Replit: install the public skills manually
+### Install the public skills manually
 
 Use the public GitHub **relyon-core** repository, not a private workspace or
-copied kit source. From the app's project root in the Replit shell:
+copied kit source. From the app's project root in a terminal:
 
 ```sh
 git clone --depth 1 https://github.com/relyon-payments/relyon-core.git /tmp/relyon-core
 mkdir -p .agents/skills
 cp -R /tmp/relyon-core/skills/* .agents/skills/
-npm install @relyon/store-kit@0.1.13
+npm install @relyon/store-kit@0.1.14
 ```
 
 In channels without a repository URL in the clone command, set
@@ -579,7 +582,7 @@ example also needs `npm install express@5`; the Postgres example needs
 put browser `checkout.js` in `public/checkout.js`, and run `node main.js`.
 Serve the app's real product images at the URLs in its catalog.
 
-Add the dependency with the project's package manager: `npm install @relyon/store-kit@0.1.13`
+Add the dependency with the project's package manager: `npm install @relyon/store-kit@0.1.14`
 (or the pnpm/yarn/bun equivalent, with the same pinned version). This is the intended install path. If the
 registry can't find the package, stop and tell the merchant. Don't recreate the
 kit by hand, copy its source into the app, or call Relyon's agent routes
@@ -587,7 +590,7 @@ directly in its place.
 
 ### Server environment
 
-Set credentials using Replit's Secrets pane only, never by pasting values
+Set credentials using the host's environment settings, never by pasting values
 into chat, source files, logs or browser code. Non-secret settings can use the
 server environment too.
 
@@ -622,15 +625,15 @@ store. Wire in the database adapters below, migrate once before serving,
 and replace the example orders map with a transactional database table unique
 on payment ID. Do not reset checkout attempts or order claims on restart.
 
-### Replit hosting and hostname rotation
+### Hosting and hostname rotation
 
-Use a **Reserved VM** for always-on serving, or a deployment with **Postgres-backed
-state** that restores state across process restarts; a Reserved VM alone does not
+Use always-on serving, or a deployment with **Postgres-backed
+state** that restores state across process restarts; always-on serving alone does not
 make memory or deployment files durable. Wire the adapters in the
 durable-state reference (`references/durable-state.md`, below) for checkout attempts,
 order claims and agent events. Published files can reset on republish.
 
-Verify ownership on the actual published `*.replit.app` host (or the custom
+Verify ownership on the actual published host (or the custom
 domain), not a sleeping/changing development URL. Confirm the published host
 serves the kit routes over HTTPS before requesting verification.
 Relyon schedules daily ownership rechecks using wall time. The often-described
@@ -639,10 +642,10 @@ a missing or mismatched proof fails immediately. Inconclusive lookup failures
 leave the domain due, so retries can occur sooner than three separate days;
 a successful proof resets the counter.
 
-Rotation checklist, **dev → .replit.app → custom-domain**:
+Rotation checklist, **dev → published-host → custom-domain**:
 
 1. Use development hosts for Test only (Test agent checkout works there); never advertise them as durable public URLs.
-2. Publish, set `STORE_HOSTNAMES` to the confirmed `.replit.app` hostname first,
+2. Publish, set `STORE_HOSTNAMES` to the confirmed published hostname first,
    update `STORE_PUBLIC_URL` if set, restart the store, then add and verify that hostname.
 3. Connect the custom domain, put it first in `STORE_HOSTNAMES`, retaining the
    published hostname only while it still serves the store. Update `STORE_PUBLIC_URL`
@@ -1096,7 +1099,7 @@ export function createCheckoutFunctions(kit, { priceCart, checkouts, readCart })
 ```
 
 Each platform function creates the kit once per instance (as `relyon-setup`
-shows, with `npm:@relyon/store-kit@0.1.13`), awaits `kit.start()`, and answers with
+shows, with `npm:@relyon/store-kit@0.1.14`), awaits `kit.start()`, and answers with
 `session`, `pay` or `confirm`. A scheduled function calls `reconcile`. The page:
 
 - calls `checkout-session` with the order reference it saved last (if any).
@@ -1912,7 +1915,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.13` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.14` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -1921,10 +1924,12 @@ a "definition of done") created or appended; other
 conflicts write nothing: compare or preserve edits before `--force`. Never
 bypass symlink/marker refusals.
 
+With RELYON_API_KEY in the environment, init uses it and writes no key file.
 With no key, init creates one Test sandbox and saves it privately (outside the
 app and every git tree), sets `RELYON_API_KEY` in `.env` (0600, gitignored)
 and prints only what happened. Never read or print the private files, nor the
-ownership-link file it names: that is the merchant's. If init prints the
+ownership-link file it names: that is the merchant's. If init fails with
+a named reason, follow the remedy it prints. If init prints the
 get-key URL and `init --key-from-stdin`, open that page to get a Test key and
 run that command yourself. Example env files: `RELYON_API_KEY=` (blank; init
 fills it). A placeholder value counts as no key. The `.env` Test key is readable
@@ -1933,7 +1938,7 @@ tell the merchant. In CI or with no terminal, init creates no sandbox unless
 `RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.13`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.14`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -2036,12 +2041,14 @@ each publish if the URL changed):
 npx --no-install @relyon/store-kit webhook
 ```
 
-It registers `$STORE_PUBLIC_URL/relyon/webhooks`, idempotently, and saves the
-signing secret as `RELYON_WEBHOOK_SECRET` in `.env` (0600, gitignored), never
-printed. The deployment needs only `RELYON_API_KEY` in Secrets: in Test the
-kit resolves the webhook signing secret itself at runtime, so no copy of
-`RELYON_WEBHOOK_SECRET` is needed there. Test-only;
-`--rotate` only if the saved secret was lost. Details:
+It registers `$STORE_PUBLIC_URL/relyon/webhooks`, idempotently. Before publishing, add `RELYON_API_KEY` in the host's environment settings.
+With an environment API key, the command (and init's best-effort registration)
+writes no file: the kit resolves the webhook signing secret itself at runtime.
+Only a local file key saves `RELYON_WEBHOOK_SECRET` to gitignored `.env` (0600,
+never printed). `RELYON_WEBHOOK_SECRET` in the environment is an optional explicit
+override. `--rotate` rotates in place and, with an environment key, saves nothing;
+runtime resolution picks up the new secret. If using an explicit override,
+unset or update it in the host's environment settings after rotation. Test-only. Details:
 [webhook setup](https://github.com/relyon-payments/relyon-core/blob/main/skills/relyon-agents/SKILL.md#agent-rules).
 
 ## 6. Doctor — inspect actual findings

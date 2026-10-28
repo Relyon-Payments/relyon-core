@@ -13,7 +13,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.13` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.14` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -22,10 +22,12 @@ a "definition of done") created or appended; other
 conflicts write nothing: compare or preserve edits before `--force`. Never
 bypass symlink/marker refusals.
 
+With RELYON_API_KEY in the environment, init uses it and writes no key file.
 With no key, init creates one Test sandbox and saves it privately (outside the
 app and every git tree), sets `RELYON_API_KEY` in `.env` (0600, gitignored)
 and prints only what happened. Never read or print the private files, nor the
-ownership-link file it names: that is the merchant's. If init prints the
+ownership-link file it names: that is the merchant's. If init fails with
+a named reason, follow the remedy it prints. If init prints the
 get-key URL and `init --key-from-stdin`, open that page to get a Test key and
 run that command yourself. Example env files: `RELYON_API_KEY=` (blank; init
 fills it). A placeholder value counts as no key. The `.env` Test key is readable
@@ -34,7 +36,7 @@ tell the merchant. In CI or with no terminal, init creates no sandbox unless
 `RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.13`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.14`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -137,12 +139,14 @@ each publish if the URL changed):
 npx --no-install @relyon/store-kit webhook
 ```
 
-It registers `$STORE_PUBLIC_URL/relyon/webhooks`, idempotently, and saves the
-signing secret as `RELYON_WEBHOOK_SECRET` in `.env` (0600, gitignored), never
-printed. The deployment needs only `RELYON_API_KEY` in Secrets: in Test the
-kit resolves the webhook signing secret itself at runtime, so no copy of
-`RELYON_WEBHOOK_SECRET` is needed there. Test-only;
-`--rotate` only if the saved secret was lost. Details:
+It registers `$STORE_PUBLIC_URL/relyon/webhooks`, idempotently. Before publishing, add `RELYON_API_KEY` in the host's environment settings.
+With an environment API key, the command (and init's best-effort registration)
+writes no file: the kit resolves the webhook signing secret itself at runtime.
+Only a local file key saves `RELYON_WEBHOOK_SECRET` to gitignored `.env` (0600,
+never printed). `RELYON_WEBHOOK_SECRET` in the environment is an optional explicit
+override. `--rotate` rotates in place and, with an environment key, saves nothing;
+runtime resolution picks up the new secret. If using an explicit override,
+unset or update it in the host's environment settings after rotation. Test-only. Details:
 [webhook setup](../../relyon-agents/SKILL.md#agent-rules).
 
 ## 6. Doctor — inspect actual findings

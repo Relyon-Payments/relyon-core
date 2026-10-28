@@ -30,7 +30,7 @@ Agents never enable Live. No particular task tool is required.
 
 ## Secure setup
 
-The kit dependency is pinned to `@relyon/store-kit@0.1.13`.
+The kit dependency is pinned to `@relyon/store-kit@0.1.14`.
 For unpublished validation install the local tarball, then run its installed
 bin with `init --skip-install`; do not resolve `@latest` from the registry.
 Package managers may suppress lifecycle output or disable scripts: init still
