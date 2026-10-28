@@ -13,7 +13,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.12` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.13` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -26,16 +26,15 @@ With no key, init creates one Test sandbox and saves it privately (outside the
 app and every git tree), sets `RELYON_API_KEY` in `.env` (0600, gitignored)
 and prints only what happened. Never read or print the private files, nor the
 ownership-link file it names: that is the merchant's. If init prints the
-get-key URL and `init --key-from-stdin`, keep building. Only after building,
-if checkout still waits, give the merchant those two lines; the merchant
-pastes the key into that command. Example env files: `RELYON_API_KEY=` (blank; init
+get-key URL and `init --key-from-stdin`, open that page to get a Test key and
+run that command yourself. Example env files: `RELYON_API_KEY=` (blank; init
 fills it). A placeholder value counts as no key. The `.env` Test key is readable
 by any coding agent in the project, and remixes, forks and exports copy it:
 tell the merchant. In CI or with no terminal, init creates no sandbox unless
 `RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.12`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.13`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -129,7 +128,24 @@ Your order is still being placed", not completed. Never charge again to recover.
 Keep orders unique on payment ID. Implement every
 [retry safeguard](skills/relyon-checkout/SKILL.md#lost-answers-retries-and-reloads-never-two-charges).
 
-## 5. Doctor — inspect actual findings
+## 5. Publish, then register the webhook
+
+Publish the store, then register its webhook endpoint yourself (re-run after
+each publish if the URL changed):
+
+```sh
+npx --no-install @relyon/store-kit webhook
+```
+
+It registers `$STORE_PUBLIC_URL/relyon/webhooks`, idempotently, and saves the
+signing secret as `RELYON_WEBHOOK_SECRET` in `.env` (0600, gitignored), never
+printed. The deployment needs only `RELYON_API_KEY` in Secrets: in Test the
+kit resolves the webhook signing secret itself at runtime, so no copy of
+`RELYON_WEBHOOK_SECRET` is needed there. Test-only;
+`--rotate` only if the saved secret was lost. Details:
+[webhook setup](skills/relyon-agents/SKILL.md#agent-rules).
+
+## 6. Doctor — inspect actual findings
 
 Run it with or without a key. Set the running `STORE_PUBLIC_URL` (loopback allows HTTP/its port):
 
@@ -152,7 +168,7 @@ Use [store policies](skills/relyon-setup/SKILL.md#store-policies-explicit-synchr
 and [webhook setup](skills/relyon-agents/SKILL.md#agent-rules) when prerequisites
 exist. Handle one-time secrets privately; never sync placeholders.
 
-## 6. Genuine Test purchase
+## 7. Genuine Test purchase
 
 You run this; it is not a step for a person. With the server running on its
 Test key:
@@ -180,7 +196,7 @@ Store-hosted MCP Test hands off to the store page; Live returns
 checkout-link handoff, not direct charging. Relyon verifies agents and enforces
 consent, restrictions and limits; never bypass refusals or change identity.
 
-## 7. Handover and stop in Test
+## 8. Handover and stop in Test
 
 Use go-live's [hand-over checklist](skills/relyon-go-live/SKILL.md#hand-over-checklist).
 Give commands/URLs, checks, doctor findings, payment/order evidence or blockers,

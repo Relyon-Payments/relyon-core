@@ -15,7 +15,7 @@ build fails.
 
 ## One shared kit
 
-Create the kit once, on the server only. Next.js reads `.env` itself; the Test
+Create the kit once, on the server only. Next.js loads `.env` itself; the Test
 key init saved privately is read by `loadTestConfig()`. Never cat or print
 `.env`, and never paste the key into a command.
 

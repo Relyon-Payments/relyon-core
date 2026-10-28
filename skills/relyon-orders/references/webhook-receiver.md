@@ -2,7 +2,8 @@
 
 The kit's `/relyon/webhooks` route verifies every Relyon webhook, acts on
 `agent_rules.updated` and answers the doctor's `doctor.challenge` itself (with
-`RELYON_WEBHOOK_SECRET` set). It answers other valid events with `200` and does
+`RELYON_WEBHOOK_SECRET` set, or resolved at runtime in Test from the store's
+key when it is unset). It answers other valid events with `200` and does
 nothing else. For the doctor's `webhook` check, the kit's route is enough.
 
 Add a receiver of the app's own only when the app needs other events (for
