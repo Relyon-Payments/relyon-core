@@ -5,6 +5,11 @@ First read the relyon-setup skill (.agents/skills/relyon-setup/SKILL.md, .claude
 Do not read dist files, framework docs, or the full README.
 Six skills are references: open only the section a numbered step names.
 
+Domain verification is an agent step, not the owner's: run
+`kit.ensureDomain()` and serve its verification value, then
+`kit.verifyDomain(domain.hostname)` yourself, then re-run the doctor. Only a
+custom domain the owner has not bought yet goes to the owner.
+
 ## 1. Init first
 
 In the app's project directory:
@@ -13,7 +18,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.20` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.21` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -36,7 +41,7 @@ tell the merchant. In CI or with no terminal, init creates no sandbox unless
 `RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.20`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.21`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
