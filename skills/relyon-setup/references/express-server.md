@@ -291,7 +291,8 @@ import { listProducts } from "./store.js";
 
 const privateConfig = await loadTestConfig({ project: process.cwd() });
 const kit = createRelyonKit({
-  env: { ...process.env, ...(privateConfig.apiKey ? { RELYON_API_KEY: privateConfig.apiKey } : {}) },
+  env: { ...process.env, ...(privateConfig.apiKey ? { RELYON_API_KEY: privateConfig.apiKey } : {}),
+    ...(privateConfig.webhookSecret ? { RELYON_WEBHOOK_SECRET: privateConfig.webhookSecret } : {}) },
   // robots.txt is served by default (AI search and shopping crawlers allowed,
   // both sitemaps named). An app with its own robots.txt passes
   // robots: { existing: () => itsText } so every line is kept; robots: false opts out.

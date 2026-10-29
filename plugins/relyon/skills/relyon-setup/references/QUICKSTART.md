@@ -13,7 +13,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.14` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.15` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -36,7 +36,7 @@ tell the merchant. In CI or with no terminal, init creates no sandbox unless
 `RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.14`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.15`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -81,9 +81,11 @@ Checkout stays on-store: only Relyon's card fields enter the browser.
 Never collect card data in app code/logs or add payment intermediaries.
 Never blindly retry provisioning; preserve keys.
 Plain Node/Express servers don't read `.env`: load the key with
-`await loadTestConfig({ project: process.cwd() })` from
+`const { apiKey, webhookSecret } = await loadTestConfig({ project: process.cwd() })` from
 `@relyon/store-kit/server-config` (environment, private folder, then `.env`) or
-dotenv. Never cat or print `.env`; never paste the key into a command.
+dotenv. Pass `apiKey` into `relyon.apiKey` and `webhookSecret` into
+`rules.webhookSecret`; restart after the webhook command saves the secret.
+Never cat or print `.env`; never paste the key into a command.
 No key yet? Kit routes answer `waiting_for_sandbox_key`; never a fake key.
 Never request, print, log or commit credentials/claim URLs.
 Restart with a real Test key; resume checks without rebuilding.
