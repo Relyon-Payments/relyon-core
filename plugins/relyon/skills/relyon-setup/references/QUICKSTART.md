@@ -13,7 +13,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.16` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.17` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -36,7 +36,7 @@ tell the merchant. In CI or with no terminal, init creates no sandbox unless
 `RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.16`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.17`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -150,7 +150,8 @@ override. `--rotate` rotates in place and, with an environment key, saves nothin
 runtime resolution picks up the new secret. If using an explicit override,
 unset or update it in the host's environment settings after rotation. Live works
 the same way once approved: the Live key in the host's environment settings, no
-file. Details: [webhook setup](../../relyon-agents/SKILL.md#agent-rules).
+file. If a Live key leaks: revoke it, then run the webhook command with `--rotate` using the replacement key.
+Details: [webhook setup](../../relyon-agents/SKILL.md#agent-rules).
 
 ## 6. Doctor — inspect actual findings
 
