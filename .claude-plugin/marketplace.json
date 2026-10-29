@@ -11,7 +11,7 @@
       "name": "relyon",
       "source": "./plugins/relyon",
       "description": "Relyon skills for coding agents: store-first payments and agent commerce with @relyon/store-kit on the app's own server.",
-      "version": "0.1.66"
+      "version": "0.1.67"
     }
   ]
 }
