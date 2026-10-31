@@ -6,6 +6,11 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
+When uncertain about the kit version, run `npm view @relyon/store-kit version`.
+Compare with the actually installed version, install that exact version with the
+project's package manager, never downgrade, and run `npx @relyon/store-kit doctor`
+afterward. Report unavailable lookups honestly and respect package-age holds.
+
 Read the copied `relyon/QUICKSTART.md` first. Open a skill only when a numbered
 step names its section. Do not read dist files, framework docs, or the full README.
 The package's `QUICKSTART.md` has the same flow; six skills are references,
@@ -30,7 +35,7 @@ Agents never enable Live. No particular task tool is required.
 
 ## Secure setup
 
-The kit dependency is pinned to `@relyon/store-kit@0.1.21`.
+The kit dependency is pinned to `@relyon/store-kit@0.1.22`.
 For unpublished validation install the local tarball, then run its installed
 bin with `init --skip-install`; do not resolve `@latest` from the registry.
 Package managers may suppress lifecycle output or disable scripts: init still
