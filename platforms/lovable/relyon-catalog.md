@@ -35,7 +35,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven rules are identical in every Relyon skill. They override anything else you read.
 
-1. Install `@relyon/store-kit@0.1.37` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.39` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -67,7 +67,7 @@ Read this first. It says what of the Relyon skill below works on Lovable.
   domain. Lovable's hosting serves the app's pages and can't run the kit's
   handlers on the store's domain paths.
 - **Works in functions (untested on Lovable so far):** creating the kit with
-  `npm:@relyon/store-kit@0.1.37`, `priceCart` and `createOrder` reading the app's
+  `npm:@relyon/store-kit@0.1.39`, `priceCart` and `createOrder` reading the app's
   Supabase tables, `kit.syncCatalog`, `kit.cardFields`, `kit.createPayment`
   and `kit.reportFulfillment`. Use the two checkout functions in the
   "Checkout on a builder platform" section.
@@ -156,6 +156,25 @@ product with none of the three is refused:
   choices the app prices (bundles, add-ons, sizes). Agents then pass the
   choices on the cart line, and `priceCart` validates them.
 - No card data, secrets or customer data in any product field.
+- Fill `category` and `attributes` for every product from its actual product
+  data. A category is a product type path, for example
+  `Home & Garden > Kitchen & Dining > Tableware > Drinkware > Mugs`.
+  Never invent a missing category; add it to the product data, then sync again.
+  Attributes allow only `color`, `size`, `material`, `gender` and `age_group`.
+  When attributes are empty, the kit derives them from readable options and
+  `feed.variants` options, including colour/size aliases and all values.
+  Explicit merchant attributes always win. Ambiguous enum values or values
+  too long to represent fail with the product and field rather than guessing.
+- Ask the owner **once, early**, for their return window, eligible items,
+  return cost and published policy-page URL. Leave unanswered terms pending;
+  never invent a return window, free returns or a return cost. Keep the
+  existing policy cost/URL confirmation in `relyon-setup`. Save the confirmed
+  policy with `kit.replaceStorePolicies` or `kit.syncStorePolicies`, then
+  **sync the catalog again**. The kit reads the saved store policy on sync and
+  projects `window_days` (including zero) and `policy_url` into indexed product
+  returns only when the product has no explicit returns. Local product URLs,
+  feed metadata and options remain unchanged. A failed policy read fails sync
+  visibly; it is not treated as an unanswered owner question.
 
 ### The product type in TypeScript
 
@@ -376,8 +395,11 @@ that takes agent checkouts syncs once a Test key is set (the starter's
 prerequisite or fallback for source-backed feeds and discovery.
 
 ```js
+import { formatCatalogIssue } from "@relyon/store-kit";
 const result = await kit.syncCatalog(await listProducts()); // mode "upsert" (default)
-for (const row of result.results) if (row.status !== "published") console.warn(row.id, row.status, row.issues);
+for (const row of result.results) {
+  for (const issue of row.issues ?? []) console.warn(formatCatalogIssue(row.id, issue));
+}
 ```
 
 - `{ mode: "upsert" }` (default) adds and updates products. `{ mode: "full" }`
@@ -390,6 +412,11 @@ for (const row of result.results) if (row.status !== "published") console.warn(r
   schedule), and after `kit.start()`.
 - With `catalog.persistence` (see `relyon-setup`) the last good catalog
   survives restarts.
+- Read every sync issue, including warnings on published products. Each line
+  names the product, field and message, never an object placeholder. Missing
+  category/attributes are agent work. Until the owner confirms returns, the
+  doctor says “Waiting on the owner: set your return window”; that is not
+  checkout authority or a passing catalog when other blockers remain.
 
 ## Product pages, JSON-LD, llms.txt and the sitemap
 
