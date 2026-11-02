@@ -24,7 +24,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.39` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.45` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -34,20 +34,20 @@ conflicts write nothing: compare or preserve edits before `--force`. Never
 bypass symlink/marker refusals.
 
 With RELYON_API_KEY in the environment, init uses it and writes no key file.
-With no key, init creates one Test sandbox and saves it privately (outside the
-app and every git tree), sets `RELYON_API_KEY` in `.env` (0600, gitignored)
-and prints only what happened. Never read or print the private files, nor the
-ownership-link file it names: that is the merchant's. If init fails with
-a named reason, follow the remedy it prints. If init prints the
-get-key URL and `init --key-from-stdin`, open that page to get a Test key and
-run that command yourself. Example env files: `RELYON_API_KEY=` (blank; init
-fills it). A placeholder value counts as no key. The `.env` Test key is readable
+Init never creates sandboxes: with no key it prints the get-key URL and
+`init --key-from-stdin`; open that page to get a Test key and run that command
+yourself. The key is saved privately (outside the app and every git tree) and
+init sets `RELYON_API_KEY` in `.env` (0600, gitignored), printing only what
+happened. Never read or print the private key file: that is the merchant's.
+If init fails with a named reason, follow the remedy it prints.
+Example env files: `RELYON_API_KEY=` (blank; `init --key-from-stdin` fills it).
+A placeholder value counts as no key. The `.env` Test key is readable
 by any coding agent in the project, and remixes, forks and exports copy it:
-tell the merchant. In CI or with no terminal, init creates no sandbox unless
-`RELYON_AUTO_TEST_KEY=true` or `--auto-test-key` (coding agents are detected).
+tell the merchant. `RELYON_AUTO_TEST_KEY=true` and `--auto-test-key` are
+accepted for scripts and change nothing.
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.39`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.45`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
