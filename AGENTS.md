@@ -21,6 +21,8 @@ Merchant prompt: Build my store: <your store idea>. Use Relyon Core: run
 
 ## Recommended build order
 
+Required storefront pages: /, /products/<id>, /cart, /checkout and the policy pages. /cart is a real server-rendered or routed page that answers 200, lists the cart's line items (or an empty state) and links to /checkout. A drawer may also exist but does not replace /cart.
+
 Run `npx @relyon/store-kit@latest init` first, then read `relyon/QUICKSTART.md`.
 Open a skill only when a numbered quick-start step names its section, not all
 six full files in sequence. The package and public repository also carry
@@ -35,7 +37,7 @@ Agents never enable Live. No particular task tool is required.
 
 ## Secure setup
 
-The kit dependency is pinned to `@relyon/store-kit@0.1.45`.
+The kit dependency is pinned to `@relyon/store-kit@0.1.50`.
 For unpublished validation install the local tarball, then run its installed
 bin with `init --skip-install`; do not resolve `@latest` from the registry.
 Package managers may suppress lifecycle output or disable scripts: init still

@@ -24,7 +24,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.45` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.50` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -47,7 +47,7 @@ tell the merchant. `RELYON_AUTO_TEST_KEY=true` and `--auto-test-key` are
 accepted for scripts and change nothing.
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.45`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.50`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -123,6 +123,8 @@ existing policy with the [robots merge](../../relyon-catalog/SKILL.md#robots-ser
 Feed export/discovery is not channel approval or permission to buy.
 
 ## 4. Store-owned checkout
+
+Required storefront pages: /, /products/<id>, /cart, /checkout and the policy pages. /cart is a real server-rendered or routed page that answers 200, lists the cart's line items (or an empty state) and links to /checkout. A drawer may also exist but does not replace /cart.
 
 Use checkout's
 [flow](../../relyon-checkout/SKILL.md#the-flow) and

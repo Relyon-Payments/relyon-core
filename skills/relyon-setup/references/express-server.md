@@ -1,7 +1,7 @@
 # Express server with the store kit
 
 A complete Express 5 app: the kit's routes, a homepage with the product list,
-a product page, the policy pages its footer links to, the checkout page on the
+a product page, a real cart page, the policy pages its footer links to, the checkout page on the
 store's domain, and the pay, confirm and order status routes.
 `store.js` is in the `relyon-catalog` skill (`references/example-store.md`),
 `relyon.js` is in this skill's `SKILL.md`, and `checkout-flow.js` (the
@@ -141,7 +141,7 @@ ${footer()}
 </body></html>`);
   });
 
-  // "Buy now": the form posts here, and a 303 sends the shopper to checkout.
+  // Add to cart: the form posts here, and a 303 sends the shopper to /cart.
   // kit.redirect(request, path) builds the Location on this request's validated store
   // address. Never build a Location from req.url or a Web request.url: a dev
   // server bound to 0.0.0.0 can name that bind address, which no browser opens.
@@ -150,8 +150,32 @@ ${footer()}
     if (!product) return res.status(404).send("Not found");
     const quantity = Math.min(99, Math.max(1, Math.trunc(Number(req.body?.quantity) || 1)));
     const query = new URLSearchParams({ product: product.merchant_product_id, quantity: String(quantity) });
-    const seeOther = kit.redirect(webRequest(req), `/checkout?${query}`);
+    const seeOther = kit.redirect(webRequest(req), `/cart?${query}`);
     res.status(seeOther.status).set("cache-control", "no-store").location(seeOther.headers.get("location")).end();
+  });
+
+  // This minimal example keeps only product/quantity in the URL, never prices.
+  // A deployed store can read its durable shopper cart/session here instead.
+  app.get("/cart", async (req, res) => {
+    const id = String(req.query.product ?? "");
+    if (!id) return res.type("html").send(`<!doctype html><meta charset="utf-8"><title>Cart</title>
+<h1>Cart</h1><p>Your cart is empty.</p><a href="/checkout">Checkout</a>${footer()}`);
+    const product = getProduct(id);
+    if (!product) return res.status(404).send("Not found");
+    const quantity = Math.min(99, Math.max(1, Math.trunc(Number(req.query.quantity) || 1)));
+    let cart;
+    try {
+      cart = await priceCart([{ product_id: product.merchant_product_id, quantity }], null, [],
+        { protocol: "web", operation: "landing", shippingOptionId: "ground" });
+    } catch (error) {
+      if (error instanceof StoreRefusal) return res.status(error.status).send(escape(error.message));
+      throw error;
+    }
+    const query = new URLSearchParams({ product: product.merchant_product_id, quantity: String(quantity) });
+    res.set("cache-control", "no-store").type("html").send(`<!doctype html><meta charset="utf-8"><title>Cart</title>
+<h1>Cart</h1><ul>${cart.lines.map(line => `<li>${escape(line.title)} × ${line.quantity}: ${money(line.amount, cart.currency)}</li>`).join("")}</ul>
+<p><strong>Total ${money(cart.totals.total, cart.currency)}</strong></p>
+<a href="${escape(`/checkout?${query}`)}">Checkout</a>${footer()}`);
   });
 
   // The policy pages the footer links to.
