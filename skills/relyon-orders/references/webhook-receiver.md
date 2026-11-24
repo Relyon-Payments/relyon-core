@@ -10,7 +10,8 @@ Add a receiver of the app's own only when the app needs other events (for
 example `refund.succeeded` or `dispute.opened`). It is a separate endpoint
 with its own secret, on the store's server, and it answers the challenge too.
 The helpers below use only Web Crypto, so they run on Node 20+, Deno and edge
-runtimes.
+runtimes. The signature scheme, events and retry schedule are documented at
+https://core.getrelyon.com/docs/webhooks.md.
 
 ```js webhook-receiver.js
 // Verifies Relyon webhooks over the exact raw bytes. Web Crypto only.

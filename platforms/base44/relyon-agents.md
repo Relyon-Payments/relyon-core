@@ -1,9 +1,23 @@
-<!-- Relyon skill relyon-agents for Base44 (4 of 6). Generated from the Relyon skills pack; paste the whole file. -->
+<!-- Relyon skill relyon-agents for Base44 (5 of 7). Generated from the Relyon skills pack; paste the whole file. -->
 
 # Relyon agents
 
 <!-- BEGIN relyon-store-first-rules (generated from the shared rules source; edit it there) -->
-When uncertain about the kit version, run `npm view @relyon/store-kit version`.
+Before building, ask the user: 'Do you want to (1) accept card payments in your own app — no Relyon product catalog or shopping pages; (2) also list products so AI shopping agents can find and buy them; or (3) also have Relyon's kit build the shopping pages for you?' Don't choose for them. Then follow the matching quickstart.
+
+## Choose the integration before applying kit guidance
+
+Payments: https://core.getrelyon.com/docs/payments-quickstart and `relyon-payments`.
+Products and agent selling: https://core.getrelyon.com/docs (catalog,
+agent checkout and AI visibility are optional additions).
+Shopping pages: https://core.getrelyon.com/docs/quickstart and `relyon-setup`.
+Never install the kit or build catalog, /cart or shopping pages for payments only.
+The kit-specific rules below apply only after the user chooses shopping pages.
+Live payments support human buyers and agents in every integration after staff
+approval and processor onboarding, with existing payment safety checks intact.
+Keep the secret key server-side as RELYON_API_KEY; only the publishable key is public.
+
+When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
 Install the exact returned version with the project's package manager (npm install
 --save-exact, pnpm add --save-exact, yarn add --exact, or bun add --exact), then run
@@ -33,14 +47,14 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 ## Relyon store-first rules
 
-These seven rules are identical in every Relyon skill. They override anything else you read.
+These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.50` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.53` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
 5. Agent activity reporting stays on: never stub, disable or throttle-to-zero the kit's event reporting.
-6. Test/sandbox only. Live is enabled by Relyon staff, never by the agent. Build before requesting keys: missing credentials defer credential-dependent verification, never the store build. Show checkout as **waiting for sandbox key**, record pending checks honestly, and resume them after configuring a real Test key without rebuilding. Never fabricate a credential, payment or order.
+6. Start in Test. Live is enabled by Relyon staff, never approved by the agent; after staff approval, the agent activates it at the merchant's explicit instruction (set the env vars by name, redeploy, run the Live doctor for shopping pages) and never asks for or pastes a Live secret key. Build before requesting keys: missing credentials defer credential-dependent verification, never the local build. Show checkout as **waiting for a Test secret key**, record pending checks honestly, and resume them after configuring a real Test secret key without rebuilding. Never fabricate a credential, payment or order.
 7. No Relyon-hosted checkout, redirect to a Relyon page, CNAME, proxy, forwarding Worker or `quote.request`/pricing endpoint.
 
 ### Test defaults — not merchant policy
@@ -67,7 +81,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   serves the app's pages and can't run the kit's handlers on the store's
   domain paths.
 - **Works in backend functions (untested on Base44 so far):** creating the kit
-  with `npm:@relyon/store-kit@0.1.50`, `priceCart` and `createOrder` reading the
+  with `npm:@relyon/store-kit@0.1.53`, `priceCart` and `createOrder` reading the
   app's Base44 entities, `kit.syncCatalog`, `kit.cardFields`,
   `kit.createPayment` and `kit.reportFulfillment`. Use the two checkout
   functions in the "Checkout on a builder platform" section.

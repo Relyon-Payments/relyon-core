@@ -2,6 +2,10 @@ First read the relyon-setup skill (.agents/skills/relyon-setup/SKILL.md, .claude
 
 # Relyon Core quick start — Test only
 
+This guide is only for the optional kit-built shopping pages the user chose.
+For payments only, follow https://core.getrelyon.com/docs/payments-quickstart and the
+relyon-payments skill instead: no kit, catalog or shopping pages.
+
 When uncertain about the kit version, run `npm view @relyon/store-kit version`,
 compare with the actually installed version, and install that exact version with
 the project's package manager. Never downgrade. If the lookup is unavailable, say
@@ -24,7 +28,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.50` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.53` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -47,7 +51,7 @@ tell the merchant. `RELYON_AUTO_TEST_KEY=true` and `--auto-test-key` are
 accepted for scripts and change nothing.
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.50`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.53`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -165,6 +169,7 @@ unset or update it in the host's environment settings after rotation. Live works
 the same way once approved: the Live key in the host's environment settings, no
 file. If a Live key leaks: revoke it, then run the webhook command with `--rotate` using the replacement key.
 Details: [webhook setup](../../relyon-agents/SKILL.md#agent-rules).
+The signature scheme, events and retries are at https://core.getrelyon.com/docs/webhooks.md.
 
 ## 6. Doctor — inspect actual findings
 
@@ -223,7 +228,7 @@ Use go-live's [hand-over checklist](../../relyon-go-live/SKILL.md#hand-over-chec
 Give commands/URLs, checks, doctor findings, payment/order evidence or blockers,
 defaults, pending merchant items and checks to resume. Separate discovery,
 purchase and channel approval. Never call unverified checks passed.
-Agents never enable Live or promise approval. Retain all security safeguards.
+Agents never approve Live or promise approval; after staff approval they activate it only at the merchant's explicit instruction. Retain all security safeguards.
 
 ## Need more?
 

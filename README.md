@@ -1,4 +1,19 @@
-# Relyon Core — run npx @relyon/store-kit@latest init first
+# Relyon Core — payments, products and optional shopping pages
+
+Before building, ask the user: 'Do you want to (1) accept card payments in your own app — no Relyon product catalog or shopping pages; (2) also list products so AI shopping agents can find and buy them; or (3) also have Relyon's kit build the shopping pages for you?' Don't choose for them. Then follow the matching quickstart.
+
+1. Payments for everyone: https://core.getrelyon.com/docs/payments-quickstart
+   and the `relyon-payments` skill. No catalog, kit or shopping pages required.
+2. Products and agent selling: https://core.getrelyon.com/docs. Add catalog,
+   feeds, agent checkout and AI visibility only when requested.
+3. Shopping pages: https://core.getrelyon.com/docs/quickstart. The kit
+   instructions below apply only to this optional layer.
+
+Live payments support human buyers and agents in all integrations after
+staff approval and processor onboarding, with existing safety checks.
+Pricing coming soon.
+
+## Optional shopping pages
 
 Build an AI-ready online store with any coding agent. Start in your app's directory:
 
@@ -8,13 +23,13 @@ npx @relyon/store-kit@latest init
 
 [Relyon](https://core.getrelyon.com) payments and AI-agent commerce for a store app, in one npm
 package: [`@relyon/store-kit`](https://www.npmjs.com/package/@relyon/store-kit) version
-`0.1.50`, plus six skills that teach a coding agent to build the whole store on the
+`0.1.53`, plus seven skills covering payments, products and optional shopping pages on the
 store's **own** server and domain.
 
 ## Start here
 
 Read the copied `relyon/QUICKSTART.md` first, or [QUICKSTART.md](QUICKSTART.md)
-here. Open a skill only when a numbered step names its section. The six skills
+here. Open the skill for the integration the user chose. The seven skills
 are references, not mandatory whole-file reading. Do not read dist files,
 framework docs, or the full README to start.
 The [Recommended build order](AGENTS.md#recommended-build-order) points to the
@@ -30,10 +45,10 @@ Build my store: <your store idea>. Use Relyon Core: run npx @relyon/store-kit@la
 
 `npx @relyon/store-kit init` runs in the app's directory and:
 
-- adds `@relyon/store-kit@0.1.50` (exact version) with the app's package manager,
+- adds `@relyon/store-kit@0.1.53` (exact version) with the app's package manager,
   picked from its lockfile (npm, pnpm, Yarn or Bun), and creates a minimal private `package.json`
   if there is none;
-- copies the six skills to `.agents/skills` (Codex, Replit Agent, OpenCode), `.claude/skills`
+- copies the bundled skills to `.agents/skills` (Codex, Replit Agent, OpenCode), `.claude/skills`
   (Claude Code) and `.cursor/skills` (Cursor);
 - copies `relyon/QUICKSTART.md` and points `AGENTS.md` and `CLAUDE.md` to it;
 - with `--store "<your store idea>"`, writes the idea word for word into `relyon-store-brief.md`,
@@ -75,7 +90,8 @@ belong only in host secret tooling, never chat.
 
 | Skill | What it covers |
 | --- | --- |
-| `relyon-setup` | Reference: Test sandbox key, mounting on Express, Next.js or Hono, durable state and host notes. |
+| `relyon-payments` | Payments: sessions and hosted fields in your own app, no catalog or shopping pages. |
+| `relyon-setup` | Shopping pages: Test secret key, mounting on Express, Next.js or Hono, durable state and host notes. |
 | `relyon-catalog` | Keep products and prices in the app: store-owned catalog callbacks, feeds, product JSON-LD, `llms.txt` and the product sitemap. |
 | `relyon-checkout` | The store's own checkout page, card fields, payments that charge exactly the store's total, and agent hand-offs. |
 | `relyon-agents` | Serve AI shopping agents (UCP, ACP, MCP) on the store's domain, agent rules, activity reporting and the webhook. |
@@ -85,10 +101,24 @@ belong only in host secret tooling, never chat.
 **Test only for coding agents.** Agents build and test with Test keys (`rly_test_…`), which never
 move money. Live is enabled by Relyon staff after they review the store; the kit then runs Live only
 with an explicit double opt-in (`relyon.live: true` and a Live key, see Test and Live below). The
-skills tell agents to stop and hand over rather than switch to Live.
+skills leave the Live decision to Relyon staff, then walk the agent through activating an approved store at the merchant's explicit instruction.
 
 <!-- BEGIN relyon-store-first-rules (generated from the shared rules source; edit it there) -->
-When uncertain about the kit version, run `npm view @relyon/store-kit version`.
+Before building, ask the user: 'Do you want to (1) accept card payments in your own app — no Relyon product catalog or shopping pages; (2) also list products so AI shopping agents can find and buy them; or (3) also have Relyon's kit build the shopping pages for you?' Don't choose for them. Then follow the matching quickstart.
+
+## Choose the integration before applying kit guidance
+
+Payments: https://core.getrelyon.com/docs/payments-quickstart and `relyon-payments`.
+Products and agent selling: https://core.getrelyon.com/docs (catalog,
+agent checkout and AI visibility are optional additions).
+Shopping pages: https://core.getrelyon.com/docs/quickstart and `relyon-setup`.
+Never install the kit or build catalog, /cart or shopping pages for payments only.
+The kit-specific rules below apply only after the user chooses shopping pages.
+Live payments support human buyers and agents in every integration after staff
+approval and processor onboarding, with existing payment safety checks intact.
+Keep the secret key server-side as RELYON_API_KEY; only the publishable key is public.
+
+When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
 Install the exact returned version with the project's package manager (npm install
 --save-exact, pnpm add --save-exact, yarn add --exact, or bun add --exact), then run
@@ -118,14 +148,14 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 ## Relyon store-first rules
 
-These seven rules are identical in every Relyon skill. They override anything else you read.
+These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.50` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.53` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
 5. Agent activity reporting stays on: never stub, disable or throttle-to-zero the kit's event reporting.
-6. Test/sandbox only. Live is enabled by Relyon staff, never by the agent. Build before requesting keys: missing credentials defer credential-dependent verification, never the store build. Show checkout as **waiting for sandbox key**, record pending checks honestly, and resume them after configuring a real Test key without rebuilding. Never fabricate a credential, payment or order.
+6. Start in Test. Live is enabled by Relyon staff, never approved by the agent; after staff approval, the agent activates it at the merchant's explicit instruction (set the env vars by name, redeploy, run the Live doctor for shopping pages) and never asks for or pastes a Live secret key. Build before requesting keys: missing credentials defer credential-dependent verification, never the local build. Show checkout as **waiting for a Test secret key**, record pending checks honestly, and resume them after configuring a real Test secret key without rebuilding. Never fabricate a credential, payment or order.
 7. No Relyon-hosted checkout, redirect to a Relyon page, CNAME, proxy, forwarding Worker or `quote.request`/pricing endpoint.
 
 ### Test defaults — not merchant policy
@@ -170,7 +200,7 @@ versions.
 
 ## Install for each agent
 
-`npx @relyon/store-kit init` (above) installs the kit and the same six skills for every agent below.
+For the shopping-pages integration, `npx @relyon/store-kit init` (above) installs the kit and its bundled skills for every agent below.
 The skills are in [`skills/`](skills/). Agents load them on demand when a task involves Relyon. Each
 section below also names another way to install the skills.
 
@@ -270,13 +300,13 @@ which is a runtime dependency.
 ## Install
 
 ```sh
-npm install @relyon/store-kit@0.1.50
+npm install @relyon/store-kit@0.1.53
 ```
 
-(or `pnpm add`, `yarn add`, `bun add` with the same specifier; Deno: `npm:@relyon/store-kit@0.1.50`).
+(or `pnpm add`, `yarn add`, `bun add` with the same specifier; Deno: `npm:@relyon/store-kit@0.1.53`).
 
 In a pnpm workspace, add it to the package that runs the store's server (`pnpm --filter <server
-package> add --save-exact @relyon/store-kit@0.1.50`), never the workspace root;
+package> add --save-exact @relyon/store-kit@0.1.53`), never the workspace root;
 `npx @relyon/store-kit init` does this when the workspace has one server package and otherwise
 prints that command. If a minimum release age policy holds back a new version, wait or exempt only
 `@relyon/store-kit`.
@@ -456,6 +486,27 @@ signed delivery; behind a slow tunnel that first recovery can outlast one doctor
 kit answers the doctor's challenge with a short "warming up" 503 while the recovery finishes in
 the background and Relyon's retry succeeds moments later. Configuring `RELYON_WEBHOOK_SECRET`
 (the `webhook` command saves it) skips the recovery entirely.
+
+## Google Pay
+
+Off by default. The merchant turns it on in the dashboard (Settings → Payments), either as the
+workspace default for an environment or for one store; a store without its own setting inherits
+the workspace default. Card payments are unchanged either way.
+
+Google Pay must also be enabled on the store's TRX account: email integrations@trxservices.com
+with the account's Client ID. The button renders only when the setting is on for the store taking
+the checkout and the checkout session runs on a TRX account. The Test mock processor's checkout
+stays card-only, though wallet tokens submitted through the API are accepted when the setting is
+on, so the payment path is testable without a TRX sandbox account.
+
+When a shopper completes the Google Pay sheet, the checkout page submits the wallet token
+immediately: the token's `cardSecurity` expires about a minute after the sheet closes, so the page
+never waits for a Pay click. A failed or cancelled sheet charges nothing and the shopper can pay
+by card instead.
+
+A wallet token submitted for a store where the setting is off is refused with
+`wallet_not_enabled`; nothing is charged. In Live, Google Pay follows the same gate as card
+fields: an approved Live processor account, enabled by Relyon staff.
 
 ## Checking an install: `npx @relyon/store-kit doctor`
 
@@ -930,7 +981,7 @@ agent rules, signature verification or WAF configuration and grant no payment pe
 
 Agent checkout on a hostname needs that hostname verified as the store's domain, and agent channels
 need complete store policies. Both can be done with the store's own Test key, with no Relyon admin
-step. A sandbox key has every scope it needs. A restricted key needs `catalog:read` for the
+step. A Test secret key needs `catalog:read` for the
 verification file and the reads below, and `catalog:write` to add or verify a domain or replace the
 policies. Live keys with `catalog:read` can read only their own Live domain status (including doctor diagnosis).
 Creating or verifying Live domains still requires an organization admin, except for explicitly upgraded sandboxes; other Live-key writes answer `live_not_available`

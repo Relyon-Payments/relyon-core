@@ -207,6 +207,27 @@ if (form) {
   // this script runs. The page's ready latch (above fields.html) recorded it.
   button.disabled = fields.dataset.relyonReady !== "true";
 
+  /** Sends a tokenized method to the store's server and follows the outcome. */
+  async function pay(paymentMethod) {
+    status.textContent = "Paying…";
+    // Only the order reference and the token. Never totals: the server re-prices.
+    const result = await call("/checkout/pay", { orderReference: reference, paymentMethod });
+    remember(result);
+    if (result.state === "paid" && result.order) return paid(result);
+    if (!paymentSucceeded && result.state === "open") {
+      status.textContent = result.message; // the server sent nothing
+      attemptSent = false;
+      if (button) button.disabled = false;
+      return;
+    }
+    if (!paymentSucceeded && (result.state === "closed" || result.state === "not_found")) {
+      return offerNewCheckout(result.message); // declined or refused: nothing was charged
+    }
+    // "pending" or no usable answer: the payment may have gone through.
+    showPending(result.state === "pending" ? result.message : "We can't confirm your payment yet. Don't pay again.");
+    await confirmOutcome();
+  }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (newCheckoutHref) return window.location.assign(newCheckoutHref); // "Try again": a new checkout
@@ -223,23 +244,21 @@ if (form) {
       button.disabled = false;
       return;
     }
-    status.textContent = "Paying…";
-    // Only the order reference and the token. Never totals: the server re-prices.
-    const result = await call("/checkout/pay", { orderReference: reference, paymentMethod });
-    remember(result);
-    if (result.state === "paid" && result.order) return paid(result);
-    if (!paymentSucceeded && result.state === "open") {
-      status.textContent = result.message; // the server sent nothing
-      attemptSent = false;
-      button.disabled = false;
-      return;
-    }
-    if (!paymentSucceeded && (result.state === "closed" || result.state === "not_found")) {
-      return offerNewCheckout(result.message); // declined or refused: nothing was charged
-    }
-    // "pending" or no usable answer: the payment may have gone through.
-    showPending(result.state === "pending" ? result.message : "We can't confirm your payment yet. Don't pay again.");
-    await confirmOutcome();
+    await pay(paymentMethod);
+  });
+
+  // Google Pay (only rendered when the store enabled it): the wallet sheet's
+  // answer arrives as an event. Submit at once — the wallet's cardSecurity
+  // expires about a minute after the sheet closes.
+  fields.addEventListener("relyon-payment", (event) => {
+    if (newCheckoutHref || attemptSent || !event.detail?.paymentMethod) return;
+    attemptSent = true;
+    if (button) button.disabled = true;
+    void pay(event.detail.paymentMethod);
+  });
+  // A cancelled sheet sent nothing: the shopper can pay by card instead.
+  fields.addEventListener("relyon-payment-cancelled", () => {
+    status.textContent = "Google Pay was cancelled. You can pay by card instead.";
   });
 } else if (page.dataset.state === "pending") {
   // Render the saved evidence before the first poll, including after a reload.
@@ -250,6 +269,11 @@ if (form) {
 
 - `relyon-ready` fires when the fields can take a card; `relyon-error`
   carries a message to show the shopper.
+- When the store enabled Google Pay, the fields render its button and a
+  completed sheet fires `relyon-payment` with the tokenized method; the page
+  submits it immediately because the wallet's `cardSecurity` expires about a
+  minute after the sheet closes. `relyon-payment-cancelled` means the shopper
+  backed out and nothing was sent.
 - Pay is enabled by whichever comes first: the `relyon-ready` listener, or
   the ready latch's `data-relyon-ready` mark when the fields were ready before
   `/checkout.js` ran. Without the latch, Pay can stay disabled forever.
