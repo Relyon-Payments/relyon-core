@@ -202,7 +202,11 @@ async function confirmOutcome() {
 
 if (form) {
   fields.addEventListener("relyon-ready", () => { if (!attemptSent) button.disabled = false; });
-  fields.addEventListener("relyon-error", (event) => { if (!attemptSent) status.textContent = event.detail.message; });
+  fields.addEventListener("relyon-error", (event) => {
+    // detail.code is the stable code (fields_timeout, session_expired; see references/troubleshooting.md).
+    if (event.detail.code) console.warn("card fields:", event.detail.code);
+    if (!attemptSent) status.textContent = event.detail.message;
+  });
   // The card fields script loads async, so the fields can be ready before
   // this script runs. The page's ready latch (above fields.html) recorded it.
   button.disabled = fields.dataset.relyonReady !== "true";
@@ -221,6 +225,8 @@ if (form) {
       return;
     }
     if (!paymentSucceeded && (result.state === "closed" || result.state === "not_found")) {
+      // result.code names the reason (processor_declined, wallet_payload_wrapped, …).
+      if (result.code) console.warn("payment refused:", result.code);
       return offerNewCheckout(result.message); // declined or refused: nothing was charged
     }
     // "pending" or no usable answer: the payment may have gone through.
@@ -239,7 +245,11 @@ if (form) {
       // Resolves to the payment_method object; the card data stays in the fields.
       paymentMethod = await fields.tokenize();
     } catch (error) {
-      status.textContent = error.message; // incomplete card details; nothing was sent
+      // error.code is the stable code (card_field_required, card_number_invalid,
+      // expiry_invalid, session_expired, fields_timeout); error.details has
+      // the processor's codes for logs. Never card data.
+      if (error.code) console.warn("card fields:", error.code, error.details);
+      status.textContent = error.message; // shown as it is; nothing was sent
       attemptSent = false;
       button.disabled = false;
       return;
@@ -247,14 +257,31 @@ if (form) {
     await pay(paymentMethod);
   });
 
-  // Google Pay (only rendered when the store enabled it): the wallet sheet's
-  // answer arrives as an event. Submit at once — the wallet's cardSecurity
-  // expires about a minute after the sheet closes.
-  fields.addEventListener("relyon-payment", (event) => {
-    if (newCheckoutHref || attemptSent || !event.detail?.paymentMethod) return;
+  /**
+   * Google Pay (only rendered when the store enabled it): the wallet sheet's
+   * answer arrives as a `relyon-payment` event. The same listener as
+   * `attachRelyonWallet` in `@relyon/kit/browser`: it submits
+   * `event.detail.paymentMethod` (never the whole event detail, which is
+   * refused as `wallet_payload_wrapped`) at once and once per element. The
+   * wallet data expires about 60 seconds after the sheet closes.
+   */
+  function attachRelyonWallet(element, submit) {
+    let sent = false;
+    const listener = (event) => {
+      const detail = event.detail;
+      const paymentMethod = detail && typeof detail === "object" ? detail.paymentMethod : undefined;
+      if (sent || !paymentMethod || typeof paymentMethod !== "object") return;
+      sent = true;
+      void submit(paymentMethod);
+    };
+    element.addEventListener("relyon-payment", listener);
+    return () => element.removeEventListener("relyon-payment", listener);
+  }
+  attachRelyonWallet(fields, async (paymentMethod) => {
+    if (newCheckoutHref || attemptSent) return;
     attemptSent = true;
     if (button) button.disabled = true;
-    void pay(event.detail.paymentMethod);
+    await pay(paymentMethod);
   });
   // A cancelled sheet sent nothing: the shopper can pay by card instead.
   fields.addEventListener("relyon-payment-cancelled", () => {
@@ -268,17 +295,30 @@ if (form) {
 ```
 
 - `relyon-ready` fires when the fields can take a card; `relyon-error`
-  carries a message to show the shopper.
+  carries a message to show the shopper and, for the card fields' own
+  failures, a stable `code` (`fields_timeout`, `session_expired`).
 - When the store enabled Google Pay, the fields render its button and a
   completed sheet fires `relyon-payment` with the tokenized method; the page
-  submits it immediately because the wallet's `cardSecurity` expires about a
-  minute after the sheet closes. `relyon-payment-cancelled` means the shopper
-  backed out and nothing was sent.
+  submits it immediately because the wallet's `cardSecurity` expires about 60
+  seconds after the sheet closes. Send `event.detail.paymentMethod`, never
+  `event.detail` itself: the whole detail (`{ paymentMethod, wallet }`) is
+  refused as `wallet_payload_wrapped` (the kit unwraps it, but Relyon's API
+  refuses it). With a bundler, `attachRelyonWallet(fields, submit)` from
+  `@relyon/kit/browser` is the same listener and returns a detach function.
+  `relyon-payment-cancelled` means the shopper backed out and nothing was
+  sent.
 - Pay is enabled by whichever comes first: the `relyon-ready` listener, or
   the ready latch's `data-relyon-ready` mark when the fields were ready before
   `/checkout.js` ran. Without the latch, Pay can stay disabled forever.
-- `tokenize()` rejects when the card details are incomplete. Nothing was sent,
-  so the page lets the shopper fix them and press Pay again.
+- `tokenize()` rejects when the card can't be encrypted, with a message to
+  show the shopper as it is (such as "Enter the card number." or "Payment
+  session expired, refresh the page."). `err.code` is a stable code
+  (`card_field_required`, `card_number_invalid`, `expiry_invalid`,
+  `session_expired`, `fields_timeout`) and `err.details` lists the
+  processor's error codes for the store's logs; neither holds card data.
+  Nothing was sent and the fields stay usable, so the page lets the shopper
+  fix the card and press Pay again. Each code has a section in
+  `references/troubleshooting.md`.
 - Once `/checkout/pay` was called, Pay is enabled again only when the server
   says the checkout is still `open` (nothing was sent). After a definite
   non-charge (`closed`: declined or refused; or `not_found` as the answer to

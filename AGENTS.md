@@ -48,7 +48,7 @@ Agents never approve Live; after staff approval they activate it only at the mer
 
 ## Secure setup
 
-The kit dependency is pinned to `@relyon/store-kit@0.1.53`.
+The kit dependency is pinned to `@relyon/store-kit@0.1.58`.
 For unpublished validation install the local tarball, then run its installed
 bin with `init --skip-install`; do not resolve `@latest` from the registry.
 Package managers may suppress lifecycle output or disable scripts: init still

@@ -28,6 +28,14 @@ functions both use it. It keeps one record per order reference and guarantees:
   checkout that is `confirming` (or `paid`) is shown as its status, not as new
   card fields. Only an `open` checkout, where nothing was sent, is replaced.
 
+The browser half is the checkout page (`references/checkout-page.md`). For
+Google Pay it sends `event.detail.paymentMethod`, never the whole event
+detail; the flow closes a wrapped or untyped method (`wallet_payload_wrapped`,
+`payment_method_missing_type`) before anything is sent. A bundled page can use
+the kit's `attachRelyonWallet` helper, imported from the package the store
+installed: `@relyon/kit/browser` for `@relyon/kit`, or
+`@relyon/store-kit/browser` for `@relyon/store-kit`.
+
 States the browser sees (`state` in every JSON answer):
 
 | `state` | HTTP | Meaning | The page |
@@ -48,7 +56,8 @@ successful payment into an uncertain one.
 // Server-only. The store's own checkout records, so a payment attempt is sent
 // under one order reference and only ever replayed, never sent twice.
 import {
-  AgentRefusedError, PaymentOutcomeUnknownError, RelyonProblemError, StoreRefusal,
+  AgentRefusedError, PaymentMethodShapeError, PaymentOutcomeUnknownError, RelyonProblemError, StoreRefusal,
+  paymentErrorCode,
 } from "@relyon/store-kit";
 
 /**
@@ -94,7 +103,8 @@ export function checkoutView(ref, row) {
   switch (row.state) {
     case "open": return { httpStatus: 200, body: { ...body, state: "open", message: MESSAGES.open } };
     case "paid": return { httpStatus: 200, body: { ...body, state: "paid", order: row.order ?? null, message: MESSAGES.paid } };
-    case "closed": return { httpStatus: 409, body: { ...body, state: "closed", error: row.error, message: row.message } };
+    // `code` is the stable payment error code when there is one (references/troubleshooting.md).
+    case "closed": return { httpStatus: 409, body: { ...body, state: "closed", error: row.error, ...(row.code ? { code: row.code } : {}), message: row.message } };
     default: return { httpStatus: 202, body: { ...body, state: "pending", payment_succeeded: row.paid === true, message: row.paid ? MESSAGES.paidUnsaved : MESSAGES.pending } };
   }
 }
@@ -111,9 +121,9 @@ export function createCheckoutFlow(kit, { priceCart, checkouts, findOrder = asyn
     protocol: "web", operation: "landing", shippingOptionId: inputs.shipping_option_id, agentCheckoutId: null,
   });
 
-  async function close(ref, expected, row, error, message) {
+  async function close(ref, expected, row, error, message, code = null) {
     const { attempt, ...rest } = row;
-    const saved = await checkouts.update(ref, expected, { ...rest, state: "closed", error, message });
+    const saved = await checkouts.update(ref, expected, { ...rest, state: "closed", error, code, message });
     return checkoutView(ref, saved.row);
   }
 
@@ -128,12 +138,22 @@ export function createCheckoutFlow(kit, { priceCart, checkouts, findOrder = asyn
         request: rebuild(attempt.request), info: attempt.info ?? undefined,
       });
     } catch (error) {
+      // The kit refused the payment method's shape before sending anything
+      // (wallet_payload_wrapped, payment_method_missing_type): nothing was
+      // sent on this or any earlier send, so the checkout closes.
+      if (error instanceof PaymentMethodShapeError) {
+        console.warn(`payment refused for ${ref}: ${error.code}`);
+        return close(ref, "confirming", row, error.code, "The payment couldn't be made and nothing was charged. Reload checkout to try again.", error.code);
+      }
       // A first send that is refused never reached a charge.
       if (first && error instanceof AgentRefusedError) {
         return close(ref, "confirming", row, error.code, error.message);
       }
       if (first && error instanceof RelyonProblemError) {
-        return close(ref, "confirming", row, error.code, "The payment couldn't be made and nothing was charged. Reload checkout to try again.");
+        // The specific reason (a field error code such as wallet_payload_wrapped) when Relyon named one.
+        const code = paymentErrorCode(error) ?? error.code;
+        console.warn(`payment refused for ${ref}: ${code}`);
+        return close(ref, "confirming", row, error.code, `The payment couldn't be made and nothing was charged (${code}). Reload checkout to try again.`, code);
       }
       // Anything else may have charged: keep the attempt and answer "pending".
       if (!(error instanceof PaymentOutcomeUnknownError)) {
@@ -142,7 +162,7 @@ export function createCheckoutFlow(kit, { priceCart, checkouts, findOrder = asyn
       return checkoutView(ref, (await checkouts.get(ref)) ?? row);
     }
     if (result.payment.status !== "succeeded") {
-      return close(ref, "confirming", row, "payment_failed", "The payment didn't go through and nothing was charged. Reload checkout to try again.");
+      return close(ref, "confirming", row, "payment_failed", "The payment didn't go through and nothing was charged. Reload checkout to try again.", "processor_declined");
     }
     let orderId = result.order?.id ?? null;
     if (!result.orderError && !orderId && result.orderStatus === "already_created") {

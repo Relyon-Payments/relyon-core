@@ -18,7 +18,7 @@ Never install the kit or build catalog, /cart or shopping pages for payments onl
 The kit-specific rules below apply only after the user chooses shopping pages.
 Live payments support human buyers and agents in every integration after staff
 approval and processor onboarding, with existing payment safety checks intact.
-Keep the secret key server-side as RELYON_API_KEY; only the publishable key is public.
+Use one secret key, kept server-side as RELYON_API_KEY; browser code never gets a key.
 
 When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
@@ -52,7 +52,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.53` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.58` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -88,8 +88,9 @@ not a copied historical version. Versions are dated: send
 created; the previous version, `2026-10-30`, is still accepted during the
 project-space rename window.
 
-1. Keep the secret key server-side as `RELYON_API_KEY`; the publishable key may
-   be used in browser code. Never request secret values in an agent prompt.
+1. Use one secret key, kept server-side as `RELYON_API_KEY`; browser code gets
+   only the payment session's client token, never a key. Never request secret
+   values in an agent prompt.
    Sign in at https://core.getrelyon.com/get-sandbox-key to create a sandbox.
    Init does not create one automatically.
 2. Use https://core.getrelyon.com/api/v1/payment_sessions with an idempotency key
@@ -117,9 +118,11 @@ project-space rename window.
    identical request, never a new charge. Confirm recorded outcomes before
    saying payment succeeded.
 
-A single-space workspace selects automatically for sessions, payments and refunds.
-With multiple spaces send `Relyon-Project-Space: prj_…` or
-`Relyon-Project-Space-Hostname: your verified hostname`; otherwise expect
+Each workspace has one project space, selected automatically for sessions,
+payments and refunds; to run another store, create another workspace. Only an
+older workspace with more than one project space needs
+`Relyon-Project-Space: prj_…` or
+`Relyon-Project-Space-Hostname: your verified hostname`; otherwise it gets
 `400 project_space_required`. A key limited to one project space always uses it.
 Optional product-selling policies use `/v1/project_space_policies`.
 

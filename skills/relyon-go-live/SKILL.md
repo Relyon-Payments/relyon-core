@@ -18,7 +18,7 @@ Never install the kit or build catalog, /cart or shopping pages for payments onl
 The kit-specific rules below apply only after the user chooses shopping pages.
 Live payments support human buyers and agents in every integration after staff
 approval and processor onboarding, with existing payment safety checks intact.
-Keep the secret key server-side as RELYON_API_KEY; only the publishable key is public.
+Use one secret key, kept server-side as RELYON_API_KEY; browser code never gets a key.
 
 When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
@@ -52,7 +52,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.53` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.58` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -107,6 +107,8 @@ check what `relyon-store-brief.md` says, but never write placeholder policies.
 | Doctor: Relyon's server had an error (HTTP 5xx) | Relyon is temporarily unavailable. | Try again in a few minutes. |
 | Doctor: DNS failure, timeout, connection refused or blocked | The machine running the doctor couldn't reach Relyon. | Check that machine's internet access and the Relyon base URL. |
 | `unavailable` at checkout (`service_unavailable`, HTTP 503, "Checkout is temporarily unavailable") | The kit couldn't get a usable answer from Relyon or couldn't read the store's agent rules, so it refused instead of guessing. Nothing was charged. | Check the server's `RELYON_API_KEY` and `RELYON_API_BASE_URL` and that the server can reach `core.getrelyon.com` over HTTPS; the server log names the failure. Never bypass the kit. |
+| A payment error code at checkout (`card_field_required`, `card_number_invalid`, `expiry_invalid`, `session_expired`, `fields_timeout`, `wallet_payload_wrapped`, `payment_method_missing_type`, `processor_declined`) | The card fields, the kit or Relyon named why this payment didn't happen: `err.code` from `tokenize()`, `code` in the kit's answer or log, or a field error `code` from Relyon. | Look the code up in the relyon-checkout skill's troubleshooting reference (`references/troubleshooting.md`): it says how to confirm the cause and has a prompt for the fix. |
+| Doctor `checkout` item not `PASS` (`card_fields_missing`, `card_fields_mounted_more_than_once`, `wallet_listener_missing`, `session_expired`, and the other codes in its line) | The checkout page isn't wired to take a payment: the card fields aren't mounted exactly once, Google Pay is on with no `relyon-payment` listener, or the no-charge self-test couldn't open a card-fields session. `UNVERIFIED` means the doctor couldn't check it (no browser, unreadable scripts, no Test key); it is never a pass. The dashboard shows the same status and code from the run the kit reported. | Look the code up in the relyon-checkout skill's troubleshooting reference (`references/troubleshooting.md`), fix it, and run the doctor again. Record an `UNVERIFIED` item as open if it doesn't clear. |
 | `PaymentUnavailableError` from `kit.cardFields` | Card fields couldn't be created. Nothing was charged. | Show "try again shortly"; same checks as above. |
 | HTTP 503 on `/.well-known/ucp` | The kit couldn't read the store's UCP profile from Relyon (key, base URL or Relyon unreachable). | Same checks as above; the store's domain must also be added in Relyon. |
 | HTTP 503 on `/.well-known/relyon-verification` | The kit couldn't read the store's domains from Relyon. After a failure it waits briefly before asking again. | Same checks as above, then request the file again a minute later. |

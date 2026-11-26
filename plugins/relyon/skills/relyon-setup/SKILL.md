@@ -18,7 +18,7 @@ Never install the kit or build catalog, /cart or shopping pages for payments onl
 The kit-specific rules below apply only after the user chooses shopping pages.
 Live payments support human buyers and agents in every integration after staff
 approval and processor onboarding, with existing payment safety checks intact.
-Keep the secret key server-side as RELYON_API_KEY; only the publishable key is public.
+Use one secret key, kept server-side as RELYON_API_KEY; browser code never gets a key.
 
 When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
@@ -52,7 +52,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.53` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.58` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -231,7 +231,7 @@ at or above the app), the kit belongs in the package that runs the store's
 server, never the workspace root. Run `init` from the project root: when the
 workspace has exactly one server package it installs there; otherwise it
 skips the install and prints the exact command to run, such as
-`pnpm --filter <server package> add --save-exact @relyon/store-kit@0.1.53`.
+`pnpm --filter <server package> add --save-exact @relyon/store-kit@0.1.58`.
 It still copies the skills to the project root. Running `init` inside the
 server package installs into that package.
 
@@ -551,7 +551,7 @@ start; there is nothing to claim and it never lapses unclaimed.
 After setting a real Test key, restart the server and resume pending verification
 without rebuilding. Never create a second sandbox for the same store.
 
-The sandbox record the hosted page creates (both keys are shown once, on
+The sandbox record the hosted page creates (its key is shown once, on
 creation only):
 
 ```json
@@ -560,7 +560,6 @@ creation only):
   "id": "org_…",
   "name": "Example shop",
   "livemode": false,
-  "publishableKey": "pk_test_…",
   "restrictedKey": "rly_test_…",
   "expiresAt": "2026-10-31T12:00:00.000Z"
 }
@@ -583,7 +582,8 @@ The command reads the key from stdin or a hidden prompt and saves it privately.
   transfers the key directly to the **Secrets pane**; do not read it back or ask
   the merchant to send it in chat.
 - Save only the Test secret key (`rly_test_…`, server-side) as
-  `RELYON_API_KEY`, using the platform's secret tooling. It carries every
+  `RELYON_API_KEY`, using the platform's secret tooling. It is the one Relyon
+  key the store uses; hosted card fields get a short-lived client token instead. It carries every
   merchant scope the kit needs, including creating sandboxes for the store's own
   account. Restricted keys (`rly_test_…`, `rly_live_…`) stay server-side.
 - By default the kit refuses `rly_live_…` keys: Live needs both a Live key and
@@ -604,7 +604,7 @@ copied kit source. From the app's project root in a terminal:
 git clone --depth 1 https://github.com/relyon-payments/relyon-core.git /tmp/relyon-core
 mkdir -p .agents/skills
 cp -R /tmp/relyon-core/skills/* .agents/skills/
-npm install @relyon/store-kit@0.1.53
+npm install @relyon/store-kit@0.1.58
 ```
 
 In channels without a repository URL in the clone command, set
@@ -620,7 +620,7 @@ example also needs `npm install express@5`; the Postgres example needs
 put browser `checkout.js` in `public/checkout.js`, and run `node main.js`.
 Serve the app's real product images at the URLs in its catalog.
 
-Add the dependency with the project's package manager: `npm install @relyon/store-kit@0.1.53`
+Add the dependency with the project's package manager: `npm install @relyon/store-kit@0.1.58`
 (or the pnpm/yarn/bun equivalent, with the same pinned version). This is the intended install path. If the
 registry can't find the package, stop and tell the merchant. Don't recreate the
 kit by hand, copy its source into the app, or call Relyon's agent routes
@@ -634,7 +634,7 @@ server environment too.
 
 | Setting | Required use and provenance |
 | --- | --- |
-| `RELYON_API_KEY` | Optional during build; required for credential-dependent operations. A Test key from https://core.getrelyon.com/get-sandbox-key, saved by `npx @relyon/store-kit init --key-from-stdin`, stored server-only. Not the publishable key. |
+| `RELYON_API_KEY` | Optional during build; required for credential-dependent operations. A Test key from https://core.getrelyon.com/get-sandbox-key, saved by `npx @relyon/store-kit init --key-from-stdin`, stored server-only. The only Relyon key the store needs. |
 | `STORE_HOSTNAMES` | Comma-separated bare hostnames, primary first; no scheme, port or path. For example `shop.example.com,store.example.com`. It takes precedence over `STORE_HOSTNAME`. |
 | `STORE_HOSTNAME` | Compatibility setting for a single hostname when `STORE_HOSTNAMES` is absent. The example defaults to `localhost` for local development only; set the real hostname before anything public. |
 | `STORE_PUBLIC_URL` | Optional explicit HTTPS store origin, with no path. Its hostname must match the primary configured hostname; the catalog example otherwise derives its origin from that primary hostname. |

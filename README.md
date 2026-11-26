@@ -23,7 +23,7 @@ npx @relyon/store-kit@latest init
 
 [Relyon](https://core.getrelyon.com) payments and AI-agent commerce for a store app, in one npm
 package: [`@relyon/store-kit`](https://www.npmjs.com/package/@relyon/store-kit) version
-`0.1.53`, plus seven skills covering payments, products and optional shopping pages on the
+`0.1.58`, plus seven skills covering payments, products and optional shopping pages on the
 store's **own** server and domain.
 
 ## Start here
@@ -45,7 +45,7 @@ Build my store: <your store idea>. Use Relyon Core: run npx @relyon/store-kit@la
 
 `npx @relyon/store-kit init` runs in the app's directory and:
 
-- adds `@relyon/store-kit@0.1.53` (exact version) with the app's package manager,
+- adds `@relyon/store-kit@0.1.58` (exact version) with the app's package manager,
   picked from its lockfile (npm, pnpm, Yarn or Bun), and creates a minimal private `package.json`
   if there is none;
 - copies the bundled skills to `.agents/skills` (Codex, Replit Agent, OpenCode), `.claude/skills`
@@ -116,7 +116,7 @@ Never install the kit or build catalog, /cart or shopping pages for payments onl
 The kit-specific rules below apply only after the user chooses shopping pages.
 Live payments support human buyers and agents in every integration after staff
 approval and processor onboarding, with existing payment safety checks intact.
-Keep the secret key server-side as RELYON_API_KEY; only the publishable key is public.
+Use one secret key, kept server-side as RELYON_API_KEY; browser code never gets a key.
 
 When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
@@ -150,7 +150,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.53` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.58` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -300,13 +300,13 @@ which is a runtime dependency.
 ## Install
 
 ```sh
-npm install @relyon/store-kit@0.1.53
+npm install @relyon/store-kit@0.1.58
 ```
 
-(or `pnpm add`, `yarn add`, `bun add` with the same specifier; Deno: `npm:@relyon/store-kit@0.1.53`).
+(or `pnpm add`, `yarn add`, `bun add` with the same specifier; Deno: `npm:@relyon/store-kit@0.1.58`).
 
 In a pnpm workspace, add it to the package that runs the store's server (`pnpm --filter <server
-package> add --save-exact @relyon/store-kit@0.1.53`), never the workspace root;
+package> add --save-exact @relyon/store-kit@0.1.58`), never the workspace root;
 `npx @relyon/store-kit init` does this when the workspace has one server package and otherwise
 prints that command. If a minimum release age policy holds back a new version, wait or exempt only
 `@relyon/store-kit`.
