@@ -20,6 +20,11 @@ Domain verification is an agent step, not the owner's: run
 `kit.verifyDomain(domain.hostname)` yourself, then re-run the doctor. Only a
 custom domain the owner has not bought yet goes to the owner.
 
+Relyon Setup MCP (https://core.getrelyon.com/docs/mcp): not a gate for building or Test; needed for
+a complete setup and Live. Start summary: until it is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
+Once connected: `get_status`, build, then `get_ranked_fixes` and `get_instructions`, apply, re-run the doctor.
+Ask the owner what the store brief leaves open (shop name, products, shipping, tax, policies) before inventing placeholders.
+
 ## 1. Init first
 
 In the app's project directory:
@@ -28,7 +33,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.58` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.61` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -38,9 +43,10 @@ conflicts write nothing: compare or preserve edits before `--force`. Never
 bypass symlink/marker refusals.
 
 With RELYON_API_KEY in the environment, init uses it and writes no key file.
-Init never creates sandboxes: with no key it prints the get-key URL and
-`init --key-from-stdin`; open that page to get a Test key and run that command
-yourself. The key is saved privately (outside the app and every git tree) and
+Init never creates sandboxes: with no key it prints the connect nudge, the key
+page https://core.getrelyon.com/settings/api-keys and `init --key-from-stdin`.
+The owner creates the key there (the Setup MCP connection never hands it out) and
+saves it with that command or as RELYON_API_KEY in the host's secret settings. The key is saved privately (outside the app and every git tree) and
 init sets `RELYON_API_KEY` in `.env` (0600, gitignored), printing only what
 happened. Never read or print the private key file: that is the merchant's.
 If init fails with a named reason, follow the remedy it prints.
@@ -51,7 +57,7 @@ tell the merchant. `RELYON_AUTO_TEST_KEY=true` and `--auto-test-key` are
 accepted for scripts and change nothing.
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.58`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.61`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -63,7 +69,7 @@ Workspaces: follow init's server-package command.
 | Brand | Store name, unless the merchant supplies another brand. |
 | MPN | SKU, unless the merchant supplies another MPN. |
 | Stock | Available unless told otherwise; no invented inventory count. |
-| Returns/support | Pending merchant items. Never invent them or submit placeholders as real policy data. |
+| Returns/support, shipping, tax | Ask the owner first; until they answer, these are pending merchant items. Never invent them or submit placeholders as real policy data. |
 
 Explicit facts override defaults. Ask before asserting missing tax/supplier/
 policy promises or syncing them; block dependent checks, not building.
@@ -151,6 +157,7 @@ Keep orders unique on payment ID. Implement every
 
 ## 5. Publish, then register the webhook
 
+Keys/webhook step: until the Relyon Setup MCP is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
 Publish the store, then register its webhook endpoint yourself (re-run after
 each publish if the URL changed):
 
@@ -224,6 +231,7 @@ consent, restrictions and limits; never bypass refusals or change identity.
 
 ## 8. Handover and stop in Test
 
+Before reporting done, until the Relyon Setup MCP is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
 Use go-live's [hand-over checklist](../../relyon-go-live/SKILL.md#hand-over-checklist).
 Give commands/URLs, checks, doctor findings, payment/order evidence or blockers,
 defaults, pending merchant items and checks to resume. Separate discovery,

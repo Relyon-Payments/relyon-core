@@ -23,7 +23,7 @@ npx @relyon/store-kit@latest init
 
 [Relyon](https://core.getrelyon.com) payments and AI-agent commerce for a store app, in one npm
 package: [`@relyon/store-kit`](https://www.npmjs.com/package/@relyon/store-kit) version
-`0.1.58`, plus seven skills covering payments, products and optional shopping pages on the
+`0.1.61`, plus seven skills covering payments, products and optional shopping pages on the
 store's **own** server and domain.
 
 ## Start here
@@ -45,7 +45,7 @@ Build my store: <your store idea>. Use Relyon Core: run npx @relyon/store-kit@la
 
 `npx @relyon/store-kit init` runs in the app's directory and:
 
-- adds `@relyon/store-kit@0.1.58` (exact version) with the app's package manager,
+- adds `@relyon/store-kit@0.1.61` (exact version) with the app's package manager,
   picked from its lockfile (npm, pnpm, Yarn or Bun), and creates a minimal private `package.json`
   if there is none;
 - copies the bundled skills to `.agents/skills` (Codex, Replit Agent, OpenCode), `.claude/skills`
@@ -60,8 +60,9 @@ untouched. A second run changes nothing. `--force` replaces differing skill file
 start, the store brief, and only the marked Relyon block inside `AGENTS.md` and `CLAUDE.md`.
 `--skip-install` skips the package install. It never asks for a key on the command line and never
 prints one.
-Init never creates sandboxes: open https://core.getrelyon.com/get-sandbox-key (signed in) for a Test
-key, then run `npx @relyon/store-kit init --key-from-stdin`. The key is saved in an owner-only
+Init never creates sandboxes: the owner creates the store's Test key at
+https://core.getrelyon.com/settings/api-keys (Account Settings → API keys), then runs
+`npx @relyon/store-kit init --key-from-stdin`. The key is saved in an owner-only
 private folder outside the app and every git tree: `RELYON_PRIVATE_DIR` when set, otherwise one
 folder per project under `$XDG_CONFIG_HOME/relyon` or `~/.config/relyon`. Init also sets
 `RELYON_API_KEY` in `.env` (0600, gitignored; refused with a reason when `.env` is tracked).
@@ -70,12 +71,12 @@ the Node server only, and call it with `{ project: process.cwd() }`: a plain Nod
 doesn't read `.env` by itself (`dotenv` also works). Never cat or print `.env`, and never paste the
 key into a command. Claiming ownership does not
 gate building; unclaimed sandboxes expire.
-If provisioning can't run, init prints exactly one page and one command:
-https://core.getrelyon.com/get-sandbox-key, then `npx @relyon/store-kit init --key-from-stdin`
-(the key is read from stdin or a hidden prompt). Keep building with the kit mounted and checkout
+With no key, init prints the connect nudge, then the key step with one command:
+https://core.getrelyon.com/settings/api-keys, then `npx @relyon/store-kit init --key-from-stdin`
+(the key is read from stdin or a hidden prompt), or RELYON_API_KEY in the host's secret settings. Keep building with the kit mounted and checkout
 **waiting for sandbox key**: every kit path answers `waiting_for_sandbox_key` until a key is saved.
-Open the page and run the command yourself when checkout still waits; the owner is needed only
-for policies, the support contact and Live approval. Restart the server and resume verification
+The Relyon Setup MCP connection never hands the key out; the owner is needed only for policies,
+the support contact, the store's key and Live approval. Restart the server and resume verification
 without rebuilding.
 After publish, run `npx @relyon/store-kit webhook` yourself to register the store's webhook
 endpoint (it saves the signing secret privately); re-run it after each publish if the URL
@@ -118,6 +119,37 @@ Live payments support human buyers and agents in every integration after staff
 approval and processor onboarding, with existing payment safety checks intact.
 Use one secret key, kept server-side as RELYON_API_KEY; browser code never gets a key.
 
+## Relyon Setup MCP: connect, then keep building
+
+The Relyon Setup MCP (https://core.getrelyon.com/mcp; guide: https://core.getrelyon.com/docs/mcp)
+is how a coding agent works with the merchant's Relyon account and dashboard. It is not a gate:
+building and Test never wait for it. It is required for a complete setup and for Live.
+Builders without it keep using the prompt blocks.
+
+1) Nudge the user to connect: OAuth through Relyon sign-in, or a connection key on hosts without OAuth.
+2) Once connected, check Test and Live status with `get_status`.
+3) Build, or carry on building.
+4) Afterwards, pull `get_ranked_fixes` and `get_instructions`; update the kit if `get_instructions` says it is behind, apply the fixes and re-run `npx @relyon/store-kit doctor`.
+
+Until it is connected, say this exact nudge in three places:
+
+- in the start summary: "Connect to Relyon to see your dashboard and keep this store updated."
+- at the keys/webhook step: "Connect to Relyon to see your dashboard and keep this store updated."
+- before reporting the store done: "Connect to Relyon to see your dashboard and keep this store updated."
+
+The Relyon Setup MCP connection is how your agent talks to your Relyon account and dashboard. The store still needs its own server-side Test key: you create it in your Relyon workspace at https://core.getrelyon.com/settings/api-keys (Account Settings → API keys) and save it in the host's secret settings as RELYON_API_KEY. Copying that key is expected; never paste it into chat. The connection never hands it out.
+
+Sign-in: the client opens Relyon sign-in in a browser (create the Relyon account first if the
+client's local sign-in window is short). A headless agent needs one interactive login (`/mcp` or
+the client's login command). If the browser cannot reach localhost, paste the final redirect URL
+back into the client where it supports that, or choose "Use a connection key" on the connect page. After a timeout or an expired session, run the same login again.
+
+Ask before inventing: ask the owner anything the store brief leaves open (shop name, products,
+shipping, tax, policies) before inventing placeholders. Send the answers through the Relyon Setup
+MCP when connected, and replace any marked placeholders once answers exist.
+Owner answers: ask the owner the verbatim questions, submit only confirmed answers (`answer_owner_questions` when connected); Test applies directly, Live waits for owner confirmation in the dashboard.
+Live is read-only through the Relyon Setup MCP; Live changes stay in the dashboard.
+
 When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
 Install the exact returned version with the project's package manager (npm install
@@ -150,7 +182,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.58` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.61` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -165,7 +197,7 @@ These seven kit rules are identical in every Relyon skill. They apply only to th
 | Brand | Store name, unless the merchant supplies another brand. |
 | MPN | SKU, unless the merchant supplies another MPN. |
 | Stock | Available unless told otherwise; no invented inventory count. |
-| Returns/support | Pending merchant items. Never invent them or submit placeholders as real policy data. |
+| Returns/support, shipping, tax | Ask the owner first; until they answer, these are pending merchant items. Never invent them or submit placeholders as real policy data. |
 
 Explicit merchant facts override these Test defaults. Proceed with local Test
 building; ask before asserting missing merchant promises or syncing policies.
@@ -300,13 +332,13 @@ which is a runtime dependency.
 ## Install
 
 ```sh
-npm install @relyon/store-kit@0.1.58
+npm install @relyon/store-kit@0.1.61
 ```
 
-(or `pnpm add`, `yarn add`, `bun add` with the same specifier; Deno: `npm:@relyon/store-kit@0.1.58`).
+(or `pnpm add`, `yarn add`, `bun add` with the same specifier; Deno: `npm:@relyon/store-kit@0.1.61`).
 
 In a pnpm workspace, add it to the package that runs the store's server (`pnpm --filter <server
-package> add --save-exact @relyon/store-kit@0.1.58`), never the workspace root;
+package> add --save-exact @relyon/store-kit@0.1.61`), never the workspace root;
 `npx @relyon/store-kit init` does this when the workspace has one server package and otherwise
 prints that command. If a minimum release age policy holds back a new version, wait or exempt only
 `@relyon/store-kit`.
@@ -315,8 +347,8 @@ Relyon's API base URL is `https://core.getrelyon.com/api`. The kit has no defaul
 `relyon.baseUrl`. The core kit reads no environment variables itself; the names below are the app's.
 The optional Node-only server-config loader and init read `RELYON_PRIVATE_DIR` (optional; by default
 an owner-only folder per project under `$XDG_CONFIG_HOME/relyon` or `~/.config/relyon`). With no
-usable key, init never creates one: it prints the hosted key page
-(https://core.getrelyon.com/get-sandbox-key) and `init --key-from-stdin`. A key is saved there and
+usable key, init never creates one: it prints the key page
+(https://core.getrelyon.com/settings/api-keys) and `init --key-from-stdin`. A key is saved there and
 in `.env` (0600, gitignored, never when `.env` is tracked), and init prints only what happened.
 Example env files show `RELYON_API_KEY=` (blank; `init --key-from-stdin` fills it); placeholder
 values count as no key. Mount the kit always: with no key every kit path answers
@@ -658,8 +690,8 @@ answers the shopper or agent with Relyon's status and code and a plain explanati
 `retryable: false`); `payAndConfirm` answers it with Relyon's status and code; relayed UCP, ACP and
 MCP steps answer it in the protocol's own error format. In every case nothing was charged.
 
-`npx @relyon/store-kit init` never creates sandboxes. Open
-https://core.getrelyon.com/get-sandbox-key (signed in) to create one and copy its Test key, then run
+`npx @relyon/store-kit init` never creates sandboxes. Create the store's Test key at
+https://core.getrelyon.com/settings/api-keys (Account Settings → API keys) and copy it, then run
 `npx @relyon/store-kit init --key-from-stdin`, which reads the key from stdin or a hidden prompt.
 
 The key is a `restrictedKey` (`rly_test_…`, server-side only); a sandbox created from your account

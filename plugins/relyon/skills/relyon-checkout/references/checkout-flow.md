@@ -32,9 +32,7 @@ The browser half is the checkout page (`references/checkout-page.md`). For
 Google Pay it sends `event.detail.paymentMethod`, never the whole event
 detail; the flow closes a wrapped or untyped method (`wallet_payload_wrapped`,
 `payment_method_missing_type`) before anything is sent. A bundled page can use
-the kit's `attachRelyonWallet` helper, imported from the package the store
-installed: `@relyon/kit/browser` for `@relyon/kit`, or
-`@relyon/store-kit/browser` for `@relyon/store-kit`.
+the kit's `attachRelyonWallet` helper from `@relyon/store-kit/browser`.
 
 States the browser sees (`state` in every JSON answer):
 

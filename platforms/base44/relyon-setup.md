@@ -17,6 +17,37 @@ Live payments support human buyers and agents in every integration after staff
 approval and processor onboarding, with existing payment safety checks intact.
 Use one secret key, kept server-side as RELYON_API_KEY; browser code never gets a key.
 
+## Relyon Setup MCP: connect, then keep building
+
+The Relyon Setup MCP (https://core.getrelyon.com/mcp; guide: https://core.getrelyon.com/docs/mcp)
+is how a coding agent works with the merchant's Relyon account and dashboard. It is not a gate:
+building and Test never wait for it. It is required for a complete setup and for Live.
+Builders without it keep using the prompt blocks.
+
+1) Nudge the user to connect: OAuth through Relyon sign-in, or a connection key on hosts without OAuth.
+2) Once connected, check Test and Live status with `get_status`.
+3) Build, or carry on building.
+4) Afterwards, pull `get_ranked_fixes` and `get_instructions`; update the kit if `get_instructions` says it is behind, apply the fixes and re-run `npx @relyon/store-kit doctor`.
+
+Until it is connected, say this exact nudge in three places:
+
+- in the start summary: "Connect to Relyon to see your dashboard and keep this store updated."
+- at the keys/webhook step: "Connect to Relyon to see your dashboard and keep this store updated."
+- before reporting the store done: "Connect to Relyon to see your dashboard and keep this store updated."
+
+The Relyon Setup MCP connection is how your agent talks to your Relyon account and dashboard. The store still needs its own server-side Test key: you create it in your Relyon workspace at https://core.getrelyon.com/settings/api-keys (Account Settings → API keys) and save it in the host's secret settings as RELYON_API_KEY. Copying that key is expected; never paste it into chat. The connection never hands it out.
+
+Sign-in: the client opens Relyon sign-in in a browser (create the Relyon account first if the
+client's local sign-in window is short). A headless agent needs one interactive login (`/mcp` or
+the client's login command). If the browser cannot reach localhost, paste the final redirect URL
+back into the client where it supports that, or choose "Use a connection key" on the connect page. After a timeout or an expired session, run the same login again.
+
+Ask before inventing: ask the owner anything the store brief leaves open (shop name, products,
+shipping, tax, policies) before inventing placeholders. Send the answers through the Relyon Setup
+MCP when connected, and replace any marked placeholders once answers exist.
+Owner answers: ask the owner the verbatim questions, submit only confirmed answers (`answer_owner_questions` when connected); Test applies directly, Live waits for owner confirmation in the dashboard.
+Live is read-only through the Relyon Setup MCP; Live changes stay in the dashboard.
+
 When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
 Install the exact returned version with the project's package manager (npm install
@@ -49,7 +80,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.58` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.61` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -64,7 +95,7 @@ These seven kit rules are identical in every Relyon skill. They apply only to th
 | Brand | Store name, unless the merchant supplies another brand. |
 | MPN | SKU, unless the merchant supplies another MPN. |
 | Stock | Available unless told otherwise; no invented inventory count. |
-| Returns/support | Pending merchant items. Never invent them or submit placeholders as real policy data. |
+| Returns/support, shipping, tax | Ask the owner first; until they answer, these are pending merchant items. Never invent them or submit placeholders as real policy data. |
 
 Explicit merchant facts override these Test defaults. Proceed with local Test
 building; ask before asserting missing merchant promises or syncing policies.
@@ -81,7 +112,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   serves the app's pages and can't run the kit's handlers on the store's
   domain paths.
 - **Works in backend functions (untested on Base44 so far):** creating the kit
-  with `npm:@relyon/store-kit@0.1.58`, `priceCart` and `createOrder` reading the
+  with `npm:@relyon/store-kit@0.1.61`, `priceCart` and `createOrder` reading the
   app's Base44 entities, `kit.syncCatalog`, `kit.cardFields`,
   `kit.createPayment` and `kit.reportFulfillment`. Use the two checkout
   functions in the "Checkout on a builder platform" section.
@@ -135,9 +166,9 @@ then `kit.verifyDomain(domain.hostname)` yourself, then re-run the doctor. Do
 not hand domain verification to the owner; only a custom domain the owner has
 not bought yet is an owner step.
 
-## On Replit
+## The store's key on any host
 
-Get your Test key from the Relyon dashboard and add RELYON_API_KEY in Replit Secrets before setup; never paste keys in chat.
+Create the store's Test key at https://core.getrelyon.com/settings/api-keys (Account Settings → API keys) and add it as RELYON_API_KEY in the host's secret settings; never paste keys in chat. The Relyon Setup MCP connection never hands it out.
 
 ## Facts at a glance
 
@@ -201,8 +232,8 @@ all the names involved:
 
 `npx @relyon/store-kit init` preserves an existing `RELYON_API_KEY`. It never
 creates sandboxes: with no usable key (unset, blank or a placeholder such as
-`your_key_here`, `rly_test_xxx` or `changeme`), it prints the hosted key page
-(https://core.getrelyon.com/get-sandbox-key) and the `init --key-from-stdin`
+`your_key_here`, `rly_test_xxx` or `changeme`), it prints the connect nudge, the key page
+(https://core.getrelyon.com/settings/api-keys) and the `init --key-from-stdin`
 command. `RELYON_LIVE=true` keeps init off the saved Test key. A key is saved
 on Node/POSIX:
 
@@ -241,25 +272,27 @@ on Node/POSIX:
   token, and removes every `RELYON_*` variable from the package manager
   environment. No platform secret-manager service is assumed.
 When init can't set a key (no key yet, or `RELYON_LIVE=true`), it prints
-exactly one URL and one command:
+the connect nudge, then the key step, with one command:
 
 ```text
-  1) Get a free Test key: https://core.getrelyon.com/get-sandbox-key
-  2) Then run: npx @relyon/store-kit init --key-from-stdin
+  1) Connect to Relyon to see your dashboard and keep this store updated. Connect your coding agent to the Relyon Setup MCP (https://core.getrelyon.com/docs/mcp). It isn't needed to keep building or to use Test.
+  2) Create the store's Test key at https://core.getrelyon.com/settings/api-keys (Account Settings → API keys) and copy it. The connection never hands it out.
+  3) Save it: npx @relyon/store-kit init --key-from-stdin, or as RELYON_API_KEY in the host's secret settings. Never paste it into chat.
 ```
 
-Keep building keylessly, and get the key yourself: open that page, then run
-that command and paste the key into it (it is read from stdin or a hidden
-prompt, never an argument), checked to be a Test key, saved the same way and
-never echoed. The owner is needed only for policies, the support contact and
-Live approval.
+Keep building keylessly. This is the keys/webhook step: until the Relyon Setup MCP is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
+The owner creates the key on that page (copying it is expected) and saves it
+with that command (it is read from stdin or a hidden prompt, never an
+argument; checked to be a Test key, saved the same way and never echoed) or in
+the host's secret settings. The owner is needed only for policies, the
+support contact, the store's key and Live approval.
 
 **pnpm workspaces.** In a pnpm workspace (a `pnpm-workspace.yaml`
 at or above the app), the kit belongs in the package that runs the store's
 server, never the workspace root. Run `init` from the project root: when the
 workspace has exactly one server package it installs there; otherwise it
 skips the install and prints the exact command to run, such as
-`pnpm --filter <server package> add --save-exact @relyon/store-kit@0.1.58`.
+`pnpm --filter <server package> add --save-exact @relyon/store-kit@0.1.61`.
 It still copies the skills to the project root. Running `init` inside the
 server package installs into that package.
 
@@ -297,6 +330,10 @@ of these same skills and nothing in them needs to be kept.
 
 Required storefront pages: /, /products/<id>, /cart, /checkout and the policy pages. /cart is a real server-rendered or routed page that answers 200, lists the cart's line items (or an empty state) and links to /checkout. A drawer may also exist but does not replace /cart.
 
+Start summary: before building, tell the user what you will build, what
+the owner must answer (ask before inventing, see the shared rules) and, until
+the Relyon Setup MCP is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
+
 Run `npx @relyon/store-kit@latest init` first, then read the copied
 `relyon/QUICKSTART.md`. For CLI/plugin-only installations read
 the same quick start (`references/QUICKSTART.md`, below). Open a skill only when a
@@ -312,6 +349,8 @@ Live returns `protocol_not_available`. Separate Commerce MCP supports checkout-l
 No platform approval is promised.
 
 ### Done means doctor prints DONE
+
+Before reporting the store done, if the Relyon Setup MCP is not connected, say "Connect to Relyon to see your dashboard and keep this store updated."
 
 Setup is not finished until `npx @relyon/store-kit doctor` prints
 `DONE: Test integration verified by Relyon.` and exits 0. That needs a Test
@@ -569,11 +608,11 @@ another deployment, retain its operator-confirmed API base.
 ## Get a Test sandbox
 
 If the key is already in the environment, init uses it without writing a key
-file. Otherwise init never creates one: keep building, then get a key yourself —
-open https://core.getrelyon.com/get-sandbox-key (signed in) and run
-`npx @relyon/store-kit init --key-from-stdin`, pasting the key into its
-prompt. The owner is needed only for policies, the support contact and Live
-approval.
+file. Otherwise init never creates one: keep building; the owner creates the
+store's Test key at https://core.getrelyon.com/settings/api-keys (Account
+Settings → API keys) and saves it with `npx @relyon/store-kit init
+--key-from-stdin` or as RELYON_API_KEY in the host's secret settings. The
+Relyon Setup MCP connection never hands the key out.
 A key created from the hosted page belongs to the merchant's account from the
 start; there is nothing to claim and it never lapses unclaimed.
 After setting a real Test key, restart the server and resume pending verification
@@ -593,9 +632,9 @@ creation only):
 }
 ```
 
-Start in **Test**. Sandbox creation is authenticated and lives on the hosted key
-page: open https://core.getrelyon.com/get-sandbox-key in a browser (signed in) to
-create a sandbox named for the store and copy its Test key. When you cannot run
+Start in **Test**. Keys are created signed in, on the one key page:
+https://core.getrelyon.com/settings/api-keys (Account Settings → API keys) shows
+the account, workspace and project space the key belongs to, with a copy button. When you cannot run
 init yourself, give the merchant this command to run in their own interactive
 shell (not through your tools, so the key never reaches the conversation):
 
@@ -607,7 +646,7 @@ The command reads the key from stdin or a hidden prompt and saves it privately.
 
 - Keys are shown once. Display them only in the merchant's interactive **Shell**,
   never in chat, captured logs, source control or browser code. The merchant
-  transfers the key directly to the **Secrets pane**; do not read it back or ask
+  transfers the key directly to the host's secret settings; do not read it back or ask
   the merchant to send it in chat.
 - Save only the Test secret key (`rly_test_…`, server-side) as
   `RELYON_API_KEY`, using the platform's secret tooling. It is the one Relyon
@@ -632,7 +671,7 @@ copied kit source. From the app's project root in a terminal:
 git clone --depth 1 https://github.com/relyon-payments/relyon-core.git /tmp/relyon-core
 mkdir -p .agents/skills
 cp -R /tmp/relyon-core/skills/* .agents/skills/
-npm install @relyon/store-kit@0.1.58
+npm install @relyon/store-kit@0.1.61
 ```
 
 In channels without a repository URL in the clone command, set
@@ -648,7 +687,7 @@ example also needs `npm install express@5`; the Postgres example needs
 put browser `checkout.js` in `public/checkout.js`, and run `node main.js`.
 Serve the app's real product images at the URLs in its catalog.
 
-Add the dependency with the project's package manager: `npm install @relyon/store-kit@0.1.58`
+Add the dependency with the project's package manager: `npm install @relyon/store-kit@0.1.61`
 (or the pnpm/yarn/bun equivalent, with the same pinned version). This is the intended install path. If the
 registry can't find the package, stop and tell the merchant. Don't recreate the
 kit by hand, copy its source into the app, or call Relyon's agent routes
@@ -662,7 +701,7 @@ server environment too.
 
 | Setting | Required use and provenance |
 | --- | --- |
-| `RELYON_API_KEY` | Optional during build; required for credential-dependent operations. A Test key from https://core.getrelyon.com/get-sandbox-key, saved by `npx @relyon/store-kit init --key-from-stdin`, stored server-only. The only Relyon key the store needs. |
+| `RELYON_API_KEY` | Optional during build; required for credential-dependent operations. A Test key from https://core.getrelyon.com/settings/api-keys, saved by `npx @relyon/store-kit init --key-from-stdin`, stored server-only. The only Relyon key the store needs. |
 | `STORE_HOSTNAMES` | Comma-separated bare hostnames, primary first; no scheme, port or path. For example `shop.example.com,store.example.com`. It takes precedence over `STORE_HOSTNAME`. |
 | `STORE_HOSTNAME` | Compatibility setting for a single hostname when `STORE_HOSTNAMES` is absent. The example defaults to `localhost` for local development only; set the real hostname before anything public. |
 | `STORE_PUBLIC_URL` | Optional explicit HTTPS store origin, with no path. Its hostname must match the primary configured hostname; the catalog example otherwise derives its origin from that primary hostname. |
@@ -1168,7 +1207,7 @@ export function createCheckoutFunctions(kit, { priceCart, checkouts, readCart })
 ```
 
 Each platform function creates the kit once per instance (as `relyon-setup`
-shows, with `npm:@relyon/store-kit@0.1.58`), awaits `kit.start()`, and answers with
+shows, with `npm:@relyon/store-kit@0.1.61`), awaits `kit.start()`, and answers with
 `session`, `pay` or `confirm`. A scheduled function calls `reconcile`. The page:
 
 - calls `checkout-session` with the order reference it saved last (if any).
@@ -2079,6 +2118,11 @@ Domain verification is an agent step, not the owner's: run
 `kit.verifyDomain(domain.hostname)` yourself, then re-run the doctor. Only a
 custom domain the owner has not bought yet goes to the owner.
 
+Relyon Setup MCP (https://core.getrelyon.com/docs/mcp): not a gate for building or Test; needed for
+a complete setup and Live. Start summary: until it is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
+Once connected: `get_status`, build, then `get_ranked_fixes` and `get_instructions`, apply, re-run the doctor.
+Ask the owner what the store brief leaves open (shop name, products, shipping, tax, policies) before inventing placeholders.
+
 ## 1. Init first
 
 In the app's project directory:
@@ -2087,7 +2131,7 @@ In the app's project directory:
 npx @relyon/store-kit@latest init
 ```
 
-Read `relyon/QUICKSTART.md`. Init installs kit `0.1.58` and references.
+Read `relyon/QUICKSTART.md`. Init installs kit `0.1.61` and references.
 Linked skills are in `.agents/skills/` or `.cursor/skills/` (Claude Code:
 `.claude/skills/`); look in both before concluding a skill is missing.
 `init --store "your idea"` saves merchant data, not instructions; `--help` lists
@@ -2097,9 +2141,10 @@ conflicts write nothing: compare or preserve edits before `--force`. Never
 bypass symlink/marker refusals.
 
 With RELYON_API_KEY in the environment, init uses it and writes no key file.
-Init never creates sandboxes: with no key it prints the get-key URL and
-`init --key-from-stdin`; open that page to get a Test key and run that command
-yourself. The key is saved privately (outside the app and every git tree) and
+Init never creates sandboxes: with no key it prints the connect nudge, the key
+page https://core.getrelyon.com/settings/api-keys and `init --key-from-stdin`.
+The owner creates the key there (the Setup MCP connection never hands it out) and
+saves it with that command or as RELYON_API_KEY in the host's secret settings. The key is saved privately (outside the app and every git tree) and
 init sets `RELYON_API_KEY` in `.env` (0600, gitignored), printing only what
 happened. Never read or print the private key file: that is the merchant's.
 If init fails with a named reason, follow the remedy it prints.
@@ -2110,7 +2155,7 @@ tell the merchant. `RELYON_AUTO_TEST_KEY=true` and `--auto-test-key` are
 accepted for scripts and change nothing.
 
 Plain npm install? Still run init first; scripts/output may be disabled.
-Reproducible dependency: `npm install @relyon/store-kit@0.1.58`.
+Reproducible dependency: `npm install @relyon/store-kit@0.1.61`.
 Unpublished validation: install the local tarball, then run
 `./node_modules/.bin/store-kit init --skip-install`, never `@latest`.
 Workspaces: follow init's server-package command.
@@ -2122,7 +2167,7 @@ Workspaces: follow init's server-package command.
 | Brand | Store name, unless the merchant supplies another brand. |
 | MPN | SKU, unless the merchant supplies another MPN. |
 | Stock | Available unless told otherwise; no invented inventory count. |
-| Returns/support | Pending merchant items. Never invent them or submit placeholders as real policy data. |
+| Returns/support, shipping, tax | Ask the owner first; until they answer, these are pending merchant items. Never invent them or submit placeholders as real policy data. |
 
 Explicit facts override defaults. Ask before asserting missing tax/supplier/
 policy promises or syncing them; block dependent checks, not building.
@@ -2210,6 +2255,7 @@ Keep orders unique on payment ID. Implement every
 
 ## 5. Publish, then register the webhook
 
+Keys/webhook step: until the Relyon Setup MCP is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
 Publish the store, then register its webhook endpoint yourself (re-run after
 each publish if the URL changed):
 
@@ -2283,6 +2329,7 @@ consent, restrictions and limits; never bypass refusals or change identity.
 
 ## 8. Handover and stop in Test
 
+Before reporting done, until the Relyon Setup MCP is connected, say "Connect to Relyon to see your dashboard and keep this store updated."
 Use go-live's [hand-over checklist](https://github.com/relyon-payments/relyon-core/blob/main/skills/relyon-go-live/SKILL.md#hand-over-checklist).
 Give commands/URLs, checks, doctor findings, payment/order evidence or blockers,
 defaults, pending merchant items and checks to resume. Separate discovery,

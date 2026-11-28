@@ -17,6 +17,37 @@ Live payments support human buyers and agents in every integration after staff
 approval and processor onboarding, with existing payment safety checks intact.
 Use one secret key, kept server-side as RELYON_API_KEY; browser code never gets a key.
 
+## Relyon Setup MCP: connect, then keep building
+
+The Relyon Setup MCP (https://core.getrelyon.com/mcp; guide: https://core.getrelyon.com/docs/mcp)
+is how a coding agent works with the merchant's Relyon account and dashboard. It is not a gate:
+building and Test never wait for it. It is required for a complete setup and for Live.
+Builders without it keep using the prompt blocks.
+
+1) Nudge the user to connect: OAuth through Relyon sign-in, or a connection key on hosts without OAuth.
+2) Once connected, check Test and Live status with `get_status`.
+3) Build, or carry on building.
+4) Afterwards, pull `get_ranked_fixes` and `get_instructions`; update the kit if `get_instructions` says it is behind, apply the fixes and re-run `npx @relyon/store-kit doctor`.
+
+Until it is connected, say this exact nudge in three places:
+
+- in the start summary: "Connect to Relyon to see your dashboard and keep this store updated."
+- at the keys/webhook step: "Connect to Relyon to see your dashboard and keep this store updated."
+- before reporting the store done: "Connect to Relyon to see your dashboard and keep this store updated."
+
+The Relyon Setup MCP connection is how your agent talks to your Relyon account and dashboard. The store still needs its own server-side Test key: you create it in your Relyon workspace at https://core.getrelyon.com/settings/api-keys (Account Settings → API keys) and save it in the host's secret settings as RELYON_API_KEY. Copying that key is expected; never paste it into chat. The connection never hands it out.
+
+Sign-in: the client opens Relyon sign-in in a browser (create the Relyon account first if the
+client's local sign-in window is short). A headless agent needs one interactive login (`/mcp` or
+the client's login command). If the browser cannot reach localhost, paste the final redirect URL
+back into the client where it supports that, or choose "Use a connection key" on the connect page. After a timeout or an expired session, run the same login again.
+
+Ask before inventing: ask the owner anything the store brief leaves open (shop name, products,
+shipping, tax, policies) before inventing placeholders. Send the answers through the Relyon Setup
+MCP when connected, and replace any marked placeholders once answers exist.
+Owner answers: ask the owner the verbatim questions, submit only confirmed answers (`answer_owner_questions` when connected); Test applies directly, Live waits for owner confirmation in the dashboard.
+Live is read-only through the Relyon Setup MCP; Live changes stay in the dashboard.
+
 When using the optional kit and uncertain about its version, run `npm view @relyon/store-kit version`.
 Compare it with the store project's actually installed version; never downgrade.
 Install the exact returned version with the project's package manager (npm install
@@ -49,7 +80,7 @@ do not guess a latest version. Respect package-age holds without changing settin
 
 These seven kit rules are identical in every Relyon skill. They apply only to the shopping-pages integration, never to payments-only apps.
 
-1. Install `@relyon/store-kit@0.1.58` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
+1. Install `@relyon/store-kit@0.1.61` from npm and mount its handlers on the app's own server (Express `@relyon/store-kit/express`, Next.js `@relyon/store-kit/next`, Hono `@relyon/store-kit/hono`).
 2. Catalog, cart and pricing stay in the app: the app owns `listProducts`, `getProduct`, `priceCart` and `createOrder`. Relyon never prices a cart. It charges exactly the final amount the store sends.
 3. Checkout runs on the store's own domain. The only Relyon element in the shopper's browser is the card fields component. Card numbers never touch the app's code, server or logs.
 4. The app calls Relyon only from its server, and only for payment, agent verification, fraud and limits, and recording.
@@ -64,7 +95,7 @@ These seven kit rules are identical in every Relyon skill. They apply only to th
 | Brand | Store name, unless the merchant supplies another brand. |
 | MPN | SKU, unless the merchant supplies another MPN. |
 | Stock | Available unless told otherwise; no invented inventory count. |
-| Returns/support | Pending merchant items. Never invent them or submit placeholders as real policy data. |
+| Returns/support, shipping, tax | Ask the owner first; until they answer, these are pending merchant items. Never invent them or submit placeholders as real policy data. |
 
 Explicit merchant facts override these Test defaults. Proceed with local Test
 building; ask before asserting missing merchant promises or syncing policies.
@@ -81,7 +112,7 @@ Read this first. It says what of the Relyon skill below works on Base44.
   serves the app's pages and can't run the kit's handlers on the store's
   domain paths.
 - **Works in backend functions (untested on Base44 so far):** creating the kit
-  with `npm:@relyon/store-kit@0.1.58`, `priceCart` and `createOrder` reading the
+  with `npm:@relyon/store-kit@0.1.61`, `priceCart` and `createOrder` reading the
   app's Base44 entities, `kit.syncCatalog`, `kit.cardFields`,
   `kit.createPayment` and `kit.reportFulfillment`. Use the two checkout
   functions in the "Checkout on a builder platform" section.
@@ -119,8 +150,8 @@ project-space rename window.
 1. Use one secret key, kept server-side as `RELYON_API_KEY`; browser code gets
    only the payment session's client token, never a key. Never request secret
    values in an agent prompt.
-   Sign in at https://core.getrelyon.com/get-sandbox-key to create a sandbox.
-   Init does not create one automatically.
+   Create the Test key at https://core.getrelyon.com/settings/api-keys
+   (Account Settings → API keys); init never creates one.
 2. Use https://core.getrelyon.com/api/v1/payment_sessions with an idempotency key
    and the amount, currency and your order reference.
 3. Pass the client token to hosted card fields. Card numbers go directly to

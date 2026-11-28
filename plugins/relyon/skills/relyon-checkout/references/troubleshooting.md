@@ -162,7 +162,7 @@ expires about 60 seconds after the sheet closes). With a bundler, use the
 kit's browser helper, imported from the package the store installed:
 
 ```text
-import { attachRelyonWallet } from "@relyon/kit/browser";
+import { attachRelyonWallet } from "@relyon/store-kit/browser";
 attachRelyonWallet(fields, (paymentMethod) => pay(paymentMethod));
 ```
 
@@ -179,7 +179,7 @@ Without a bundler, the `relyon-payment` listener in
 **Prompt for your coding agent:**
 
 ```text
-Google Pay payments fail with code wallet_payload_wrapped. In the checkout page script, the "relyon-payment" listener on <relyon-card-fields> must send event.detail.paymentMethod (an object with type "wallet_token") to our pay route, not event.detail. Submit it immediately, once per checkout, because the wallet data expires about 60 seconds after the Google Pay sheet closes. Use attachRelyonWallet from @relyon/kit/browser (or @relyon/store-kit/browser if the store installed @relyon/store-kit) if the page is bundled.
+Google Pay payments fail with code wallet_payload_wrapped. In the checkout page script, the "relyon-payment" listener on <relyon-card-fields> must send event.detail.paymentMethod (an object with type "wallet_token") to our pay route, not event.detail. Submit it immediately, once per checkout, because the wallet data expires about 60 seconds after the Google Pay sheet closes. Use attachRelyonWallet from @relyon/store-kit/browser if the page is bundled.
 ```
 
 ## payment_method_missing_type

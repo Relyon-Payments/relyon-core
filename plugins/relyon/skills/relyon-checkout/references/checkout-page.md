@@ -260,7 +260,7 @@ if (form) {
   /**
    * Google Pay (only rendered when the store enabled it): the wallet sheet's
    * answer arrives as a `relyon-payment` event. The same listener as
-   * `attachRelyonWallet` in `@relyon/kit/browser`: it submits
+   * `attachRelyonWallet` in `@relyon/store-kit/browser`: it submits
    * `event.detail.paymentMethod` (never the whole event detail, which is
    * refused as `wallet_payload_wrapped`) at once and once per element. The
    * wallet data expires about 60 seconds after the sheet closes.
@@ -304,7 +304,7 @@ if (form) {
   `event.detail` itself: the whole detail (`{ paymentMethod, wallet }`) is
   refused as `wallet_payload_wrapped` (the kit unwraps it, but Relyon's API
   refuses it). With a bundler, `attachRelyonWallet(fields, submit)` from
-  `@relyon/kit/browser` is the same listener and returns a detach function.
+  `@relyon/store-kit/browser` is the same listener and returns a detach function.
   `relyon-payment-cancelled` means the shopper backed out and nothing was
   sent.
 - Pay is enabled by whichever comes first: the `relyon-ready` listener, or
